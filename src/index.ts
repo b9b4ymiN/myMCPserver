@@ -18,6 +18,9 @@ import {
   fetchAllFinancialStatementsTool
 } from './tools/financialStatements.js';
 import { fetchHistoricalRatiosTool, analyzeHistoricalRatiosTool } from './tools/historicalRatios.js';
+import { advancedValuationTools } from './tools/advancedValuation.js';
+import { financialAnalysisTools } from './tools/financialAnalysis.js';
+import { portfolioManagementTools } from './tools/portfolioManagement.js';
 import { SERVER_CONFIG } from './config/index.js';
 
 const server = new Server(
@@ -102,7 +105,10 @@ const allTools = [
   fetchCashFlowStatementTool,
   fetchAllFinancialStatementsTool,
   fetchHistoricalRatiosTool,
-  analyzeHistoricalRatiosTool
+  analyzeHistoricalRatiosTool,
+  ...advancedValuationTools,
+  ...financialAnalysisTools,
+  ...portfolioManagementTools
 ];
 
 // Create Express app for HTTP endpoints
@@ -250,7 +256,10 @@ app.post('/mcp', async (req, res) => {
 
 // Helper functions
 function getCategory(toolName: string): string {
-  if (toolName.includes('pe_band') || toolName.includes('ddm') || toolName.includes('dcf')) {
+  if (toolName.includes('pe_band') || toolName.includes('ddm') || toolName.includes('dcf') ||
+      toolName.includes('graham_number') || toolName.includes('discounted_earnings') ||
+      toolName.includes('asset_based') || toolName.includes('ev_ebitda') ||
+      toolName.includes('margin_of_safety')) {
     return 'Valuation';
   }
   if (toolName.includes('fetch_stock') || toolName.includes('complete_valuation')) {
@@ -261,6 +270,17 @@ function getCategory(toolName: string): string {
   }
   if (toolName.includes('historical') || toolName.includes('ratios')) {
     return 'Historical Analysis';
+  }
+  if (toolName.includes('financial_health') || toolName.includes('dupont') ||
+      toolName.includes('cash_flow_quality') || toolName.includes('earnings_quality')) {
+    return 'Financial Analysis';
+  }
+  if (toolName.includes('position_size') || toolName.includes('portfolio_metrics') ||
+      toolName.includes('rebalancing') || toolName.includes('correlation')) {
+    return 'Portfolio Management';
+  }
+  if (toolName.includes('dividend_safety')) {
+    return 'Dividend Analysis';
   }
   return 'General';
 }
@@ -278,6 +298,49 @@ function getToolExample(toolName: string): any {
           currentPrice: 145.50,
           eps: 8.5,
           historicalPEs: [15.2, 16.8, 17.3, 18.1, 19.5, 18.7, 17.9]
+        }
+      };
+    case 'calculate_margin_of_safety':
+      return {
+        arguments: {
+          symbol: 'SCB',
+          currentPrice: 145.50,
+          intrinsicValue: 180.00,
+          valuationMethod: 'Multiple Methods Average',
+          riskAdjustment: 1.0
+        }
+      };
+    case 'calculate_graham_number':
+      return {
+        arguments: {
+          symbol: 'SCB',
+          eps: 14.57,
+          bookValue: 157.32,
+          currentPrice: 145.50
+        }
+      };
+    case 'calculate_position_size':
+      return {
+        arguments: {
+          symbol: 'SCB',
+          portfolioValue: 100000,
+          currentPrice: 145.50,
+          stopLossPrice: 130.00
+        }
+      };
+    case 'calculate_financial_health_score':
+      return {
+        arguments: {
+          symbol: 'SCB',
+          workingCapital: 500000000000,
+          totalAssets: 3000000000000,
+          retainedEarnings: 800000000000,
+          ebit: 200000000000,
+          marketValueEquity: 450000000000,
+          totalLiabilities: 2000000000000,
+          sales: 1000000000000,
+          netIncome: 150000000000,
+          operatingCashFlow: 300000000000
         }
       };
     case 'complete_valuation':

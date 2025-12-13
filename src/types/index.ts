@@ -59,6 +59,183 @@ export interface DCFResult {
   }[];
 }
 
+export interface MarginOfSafetyResult {
+  symbol: string;
+  currentPrice: number;
+  intrinsicValue: number;
+  marginOfSafety: number;
+  marginOfSafetyPercentage: number;
+  valuationMethod: string;
+  recommendation: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell';
+  analysis: string;
+  riskLevel: 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+}
+
+// New valuation tools
+export interface GrahamNumberResult {
+  symbol: string;
+  currentPrice: number;
+  grahamNumber: number;
+  marginOfSafety: number;
+  recommendation: 'Buy' | 'Hold' | 'Sell';
+  analysis: string;
+}
+
+export interface DiscountedEarningsResult {
+  symbol: string;
+  currentPrice: number;
+  eps: number;
+  growthRate: number;
+  discountRate: number;
+  years: number;
+  projectedEPS: number[];
+  intrinsicValue: number;
+  marginOfSafety: number;
+  recommendation: 'Buy' | 'Hold' | 'Sell';
+  analysis: string;
+}
+
+export interface AssetBasedValuationResult {
+  symbol: string;
+  currentPrice: number;
+  bookValuePerShare: number;
+  liquidationValue: number;
+  netNetWorkingCapital: number;
+  intrinsicValue: number;
+  marginOfSafety: number;
+  recommendation: 'Buy' | 'Hold' | 'Sell';
+  analysis: string;
+}
+
+export interface EVEBITDAResult {
+  symbol: string;
+  currentPrice: number;
+  enterpriseValue: number;
+  ebitda: number;
+  evEbitdaRatio: number;
+  industryAverage: number;
+  relativeValuation: 'Undervalued' | 'Fairly Valued' | 'Overvalued';
+  recommendation: 'Buy' | 'Hold' | 'Sell';
+  analysis: string;
+}
+
+// Financial quality tools
+export interface FinancialHealthScore {
+  symbol: string;
+  altmanZScore: number;
+  piotroskiFScore: number;
+  bankruptcyRisk: 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+  financialStrength: 'Excellent' | 'Good' | 'Average' | 'Weak' | 'Poor';
+  overallScore: number;
+  recommendation: string;
+}
+
+export interface DuPontAnalysisResult {
+  symbol: string;
+  roe: number;
+  components: {
+    netProfitMargin: number;
+    assetTurnover: number;
+    financialLeverage: number;
+  };
+  analysis: string;
+  trend: 'Improving' | 'Declining' | 'Stable';
+}
+
+// Technical analysis tools
+export interface TechnicalIndicators {
+  symbol: string;
+  price: number;
+  movingAverages: {
+    sma20: number;
+    sma50: number;
+    sma200: number;
+    ema12: number;
+    ema26: number;
+  };
+  signals: {
+    goldenCross: boolean;
+    deathCross: boolean;
+    bullishMACD: boolean;
+    bearishMACD: boolean;
+  };
+  recommendation: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell';
+}
+
+export interface RSITrendAnalysis {
+  symbol: string;
+  rsi: number;
+  trend: 'Oversold' | 'Undervalued' | 'Neutral' | 'Overvalued' | 'Overbought';
+  signal: 'Buy' | 'Sell' | 'Hold';
+  divergence: {
+    bullish: boolean;
+    bearish: boolean;
+  };
+}
+
+// Portfolio management tools
+export interface PortfolioMetrics {
+  totalValue: number;
+  expectedReturn: number;
+  volatility: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  var: number; // Value at Risk
+  beta: number;
+  alpha: number;
+}
+
+export interface PositionSizingResult {
+  symbol: string;
+  portfolioValue: number;
+  riskPerTrade: number;
+  stopLoss: number;
+  maxPositionSize: number;
+  sharesToBuy: number;
+  positionValue: number;
+  riskAmount: number;
+}
+
+// Market sentiment tools
+export interface MarketSentiment {
+  symbol: string;
+  institutionalOwnership: number;
+  insiderTransactions: 'Buying' | 'Selling' | 'Neutral';
+  analystRatings: {
+    strongBuy: number;
+    buy: number;
+    hold: number;
+    sell: number;
+    strongSell: number;
+  };
+  shortInterest: number;
+  sentimentScore: number;
+  contrarianSignal: 'Strong Buy' | 'Buy' | 'Neutral' | 'Sell' | 'Strong Sell';
+}
+
+// Dividend analysis tools
+export interface DividendSafetyAnalysis {
+  symbol: string;
+  currentYield: number;
+  payoutRatio: number;
+  freeCashFlowPayout: number;
+  dividendGrowthRate: number;
+  yearsOfGrowth: number;
+  safetyScore: number;
+  riskLevel: 'Very Safe' | 'Safe' | 'Moderate' | 'Risky' | 'Very Risky';
+  recommendation: string;
+}
+
+export interface DividendAristocratScore {
+  symbol: string;
+  yearsOfDividendGrowth: number;
+  averageGrowthRate: number;
+  yieldOnCost: number;
+  dividendCoverageRatio: number;
+  aristocratScore: number;
+  qualified: boolean;
+}
+
 export interface Tool {
   name: string;
   description: string;
@@ -66,6 +243,7 @@ export interface Tool {
   handler: (args: any) => Promise<any>;
 }
 
+// Re-add missing exports from original types
 export interface SetWatchData {
   marketCap: number;
   enterpriseValue: number;

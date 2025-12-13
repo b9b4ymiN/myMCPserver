@@ -267,11 +267,54 @@ export const completeValuationTool: Tool = {
         overallRecommendation = 'Hold';
       }
 
+      // Calculate average intrinsic value and margin of safety
+      const peIntrinsicValue = avgPE * stockData.eps;
+      const intrinsicValues = [peIntrinsicValue];
+      if (results.valuations.ddm && results.valuations.ddm.intrinsicValue) {
+        intrinsicValues.push(results.valuations.ddm.intrinsicValue);
+      }
+      intrinsicValues.push(dcfIntrinsicValue);
+
+      const averageIntrinsicValue = intrinsicValues.reduce((a, b) => a + b, 0) / intrinsicValues.length;
+      const averageMarginOfSafety = ((averageIntrinsicValue - currentPrice) / averageIntrinsicValue) * 100;
+
+      // Margin of Safety analysis
+      let mosRecommendation: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell';
+      let mosRiskLevel: 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+
+      if (averageMarginOfSafety >= 50) {
+        mosRecommendation = 'Strong Buy';
+        mosRiskLevel = 'Very Low';
+      } else if (averageMarginOfSafety >= 30) {
+        mosRecommendation = 'Buy';
+        mosRiskLevel = 'Low';
+      } else if (averageMarginOfSafety >= 10) {
+        mosRecommendation = 'Hold';
+        mosRiskLevel = 'Medium';
+      } else if (averageMarginOfSafety >= -10) {
+        mosRecommendation = 'Sell';
+        mosRiskLevel = 'High';
+      } else {
+        mosRecommendation = 'Strong Sell';
+        mosRiskLevel = 'Very High';
+      }
+
+      results.valuations.marginOfSafety = {
+        averageIntrinsicValue,
+        marginOfSafety: averageMarginOfSafety,
+        recommendation: mosRecommendation,
+        riskLevel: mosRiskLevel,
+        analysis: `Average intrinsic value across methods: $${averageIntrinsicValue.toFixed(2)}.
+                  Current margin of safety: ${averageMarginOfSafety.toFixed(1)}%.
+                  This suggests the stock is ${mosRecommendation.toLowerCase()} with ${mosRiskLevel.toLowerCase()} risk.`
+      };
+
       results.overallRecommendation = overallRecommendation;
       results.summary = {
         peBand: peRecommendation,
         ddm: results.valuations.ddm.recommendation || 'N/A',
         dcf: dcfRecommendation,
+        marginOfSafety: mosRecommendation,
         overall: overallRecommendation
       };
 

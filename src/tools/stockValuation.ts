@@ -1,4 +1,4 @@
-import { StockData, PEBandResult, DDMResult, DCFResult, Tool } from '../types/index.js';
+import { StockData, PEBandResult, DDMResult, DCFResult, MarginOfSafetyResult, Tool } from '../types/index.js';
 
 // Helper functions
 function calculatePE(price: number, eps: number): number {
@@ -266,9 +266,118 @@ const dcfTool: Tool = {
   }
 };
 
+// Margin of Safety Calculation Tool
+const marginOfSafetyTool: Tool = {
+  name: 'calculate_margin_of_safety',
+  description: 'Calculate Margin of Safety for value investing decisions',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      symbol: { type: 'string', description: 'Stock symbol (e.g., AAPL)' },
+      currentPrice: { type: 'number', description: 'Current stock price' },
+      intrinsicValue: { type: 'number', description: 'Calculated intrinsic value of the stock' },
+      valuationMethod: {
+        type: 'string',
+        description: 'Method used to calculate intrinsic value',
+        enum: ['DCF', 'DDM', 'PE Band', 'Asset-Based', 'Multiple Methods Average'],
+        default: 'Multiple Methods Average'
+      },
+      riskAdjustment: {
+        type: 'number',
+        description: 'Risk adjustment factor (0.8 for high risk, 1.0 for normal, 1.2 for low risk)',
+        default: 1.0,
+        minimum: 0.5,
+        maximum: 1.5
+      }
+    },
+    required: ['symbol', 'currentPrice', 'intrinsicValue']
+  },
+  handler: async (args) => {
+    const { symbol, currentPrice, intrinsicValue, valuationMethod = 'Multiple Methods Average', riskAdjustment = 1.0 } = args;
+
+    try {
+      // Validate inputs
+      if (currentPrice <= 0) {
+        throw new Error('Current price must be positive');
+      }
+
+      if (intrinsicValue <= 0) {
+        throw new Error('Intrinsic value must be positive');
+      }
+
+      // Calculate margin of safety
+      const marginOfSafety = ((intrinsicValue - currentPrice) / intrinsicValue) * 100;
+      const adjustedIntrinsicValue = intrinsicValue * riskAdjustment;
+      const adjustedMarginOfSafety = ((adjustedIntrinsicValue - currentPrice) / adjustedIntrinsicValue) * 100;
+
+      // Determine recommendation based on margin of safety
+      let recommendation: 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell';
+      let riskLevel: 'Very Low' | 'Low' | 'Medium' | 'High' | 'Very High';
+      let analysis: string;
+
+      if (adjustedMarginOfSafety >= 50) {
+        recommendation = 'Strong Buy';
+        riskLevel = 'Very Low';
+        analysis = `Excellent margin of safety of ${adjustedMarginOfSafety.toFixed(1)}%. Stock is significantly undervalued with substantial downside protection.`;
+      } else if (adjustedMarginOfSafety >= 30) {
+        recommendation = 'Buy';
+        riskLevel = 'Low';
+        analysis = `Good margin of safety of ${adjustedMarginOfSafety.toFixed(1)}%. Stock appears undervalued with reasonable downside protection.`;
+      } else if (adjustedMarginOfSafety >= 10) {
+        recommendation = 'Hold';
+        riskLevel = 'Medium';
+        analysis = `Moderate margin of safety of ${adjustedMarginOfSafety.toFixed(1)}%. Stock is reasonably valued but may not provide sufficient margin for error.`;
+      } else if (adjustedMarginOfSafety >= -10) {
+        recommendation = 'Sell';
+        riskLevel = 'High';
+        analysis = `Negative margin of safety of ${adjustedMarginOfSafety.toFixed(1)}%. Stock appears overvalued with limited upside potential.`;
+      } else {
+        recommendation = 'Strong Sell';
+        riskLevel = 'Very High';
+        analysis = `Significant negative margin of safety of ${adjustedMarginOfSafety.toFixed(1)}%. Stock is substantially overvalued with high risk of loss.`;
+      }
+
+      // Add additional context
+      const priceToIntrinsic = (currentPrice / intrinsicValue).toFixed(2);
+      const adjustedPriceToIntrinsic = (currentPrice / adjustedIntrinsicValue).toFixed(2);
+
+      analysis += ` Price is ${priceToIntrinsic}x intrinsic value. After risk adjustment (factor: ${riskAdjustment}), price is ${adjustedPriceToIntrinsic}x adjusted intrinsic value.`;
+
+      // Value investing principles check
+      const principlesCheck = {
+        belowIntrinsicValue: currentPrice < intrinsicValue,
+        adequateMargin: adjustedMarginOfSafety >= 20,
+        reasonableRisk: riskLevel !== 'Very High'
+      };
+
+      const result: MarginOfSafetyResult = {
+        symbol,
+        currentPrice,
+        intrinsicValue: adjustedIntrinsicValue,
+        marginOfSafety: adjustedIntrinsicValue - currentPrice,
+        marginOfSafetyPercentage: adjustedMarginOfSafety,
+        valuationMethod,
+        recommendation,
+        analysis,
+        riskLevel
+      };
+
+      // Add principles check to result
+      (result as any).principlesCheck = principlesCheck;
+      (result as any).unadjustedMarginOfSafety = marginOfSafety;
+      (result as any).riskAdjustmentFactor = riskAdjustment;
+
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to calculate margin of safety for ${symbol}: ${error}`);
+    }
+  }
+};
+
 // Export all tools
 export const stockValuationTools: Tool[] = [
   peBandTool,
   ddmTool,
-  dcfTool
+  dcfTool,
+  marginOfSafetyTool
 ];
