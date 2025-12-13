@@ -19,6 +19,9 @@
 - [Features](#-features)
 - [Supported Tools](#-supported-tools)
 - [Quick Start](#-quick-start)
+- [Oracle Cloud Deployment](#oracle-cloud-deployment)
+- [n8n Integration](#n8n-integration)
+- [Documentation](#-documentation)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
 - [API Documentation](#-api-documentation)
@@ -142,6 +145,108 @@ Restart Claude Desktop to start using the tools!
 npm install -g @modelcontextprotocol/inspector
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
+
+---
+
+## ☁️ Oracle Cloud Deployment
+
+### One-Click Deployment
+
+```bash
+# Deploy to Oracle Cloud Free Tier
+chmod +x scripts/deploy-oracle.sh
+./scripts/deploy-oracle.sh
+```
+
+### Manual Deployment Steps
+
+1. **Setup Oracle Cloud Account**
+   - Create free tier account
+   - Setup compartment and VCN
+   - Generate SSH keys
+
+2. **Deploy Instance**
+   ```bash
+   # Using OCI CLI
+   oci compute instance launch \
+     --availability-domain <your-AD> \
+     --compartment-id <compartment-id> \
+     --shape VM.Standard.A1.Flex \
+     --shape-config '{"memoryInGBs": "6", "ocpus": "2"}' \
+     --display-name stock-valuation-mcp \
+     --assign-public-ip true
+   ```
+
+3. **Configure Environment**
+   ```bash
+   # SSH into instance
+   ssh -i ~/.ssh/oracle_key opc@<instance-ip>
+
+   # Setup Docker
+   sudo yum install -y docker
+   sudo systemctl start docker
+   sudo usermod -aG docker opc
+
+   # Deploy MCP Server
+   docker run -d \
+     --name stock-valuation-mcp \
+     --restart unless-stopped \
+     -p 2901:2901 \
+     -e NODE_ENV=production \
+     -e SET_WATCH_API_HOST=https://your-api.com \
+     stock-valuation-mcp:latest
+   ```
+
+For detailed deployment instructions, see [Oracle Cloud Deployment Guide](docs/ORACLE-CLOUD-DEPLOYMENT.md).
+
+---
+
+## 🔗 n8n Integration
+
+### Setting up n8n
+
+1. **Deploy n8n**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Create HTTP Request Node**
+   ```json
+   {
+     "method": "POST",
+     "url": "http://YOUR-MCP-SERVER:2901/mcp",
+     "body": {
+       "jsonrpc": "2.0",
+       "id": 1,
+       "method": "tools/call",
+       "params": {
+         "name": "fetch_stock_data",
+         "arguments": {
+           "symbol": "ADVANC"
+         }
+       }
+     }
+   }
+   ```
+
+### Example Workflows
+
+- **Daily Analysis Report**: Automatically analyze portfolio stocks every morning
+- **Price Alerts**: Get notified when stocks hit target prices
+- **Batch Valuation**: Value multiple stocks in parallel
+
+For complete n8n integration guide, see [n8n Integration Documentation](docs/N8N-INTEGRATION.md).
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Oracle Cloud Deployment](docs/ORACLE-CLOUD-DEPLOYMENT.md) | Complete guide for deploying to Oracle Cloud Free Tier |
+| [n8n Integration](docs/N8N-INTEGRATION.md) | Integrate with n8n for automated workflows |
+| [n8n API Examples](docs/N8N-API-EXAMPLES.md) | Ready-to-use n8n workflow examples |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
 
 ---
 
@@ -513,8 +618,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏‍♂️ Acknowledgments
 
-- **[Model Context Protocol](https://modelcontextprotocol.io)** - For the MCP SDK 
+- **[Model Context Protocol](https://modelcontextprotocol.io)** - For the MCP SDK
+- **[SET Watch](https://set-watch.com)** - For providing the Thai stock market data API
 - **Oracle Cloud** - For the generous free tier hosting option
+- **[n8n](https://n8n.io)** - For workflow automation capabilities
 
 ---
 

@@ -1,0 +1,109 @@
+{
+  "name": "Stock Analysis Workflow",
+  "nodes": [
+    {
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [240, 300]
+    },
+    {
+      "name": "Set Stock Symbol",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "tool",
+              "value": "fetch_stock_data"
+            },
+            {
+              "name": "arguments",
+              "value": "={{ { symbol: 'ADVANC' } }}"
+            }
+          ]
+        }
+      },
+      "position": [460, 300]
+    },
+    {
+      "name": "Call MCP Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:2901/mcp",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "jsonrpc": "2.0",
+          "id": "1",
+          "method": "tools/call",
+          "params": {
+            "name": "={{ $json.tool }}",
+            "arguments": "={{ $json.arguments }}"
+          }
+        }
+      },
+      "position": [680, 300]
+    },
+    {
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Parse MCP response\nconst mcpResponse = $json;\n\nif (mcpResponse.result && mcpResponse.result.content) {\n  const content = mcpResponse.result.content[0];\n  if (content.type === 'text') {\n    const stockData = JSON.parse(content.text);\n    return [{ json: stockData }];\n  }\n}\n\nreturn [{ json: { error: 'Invalid response format' } }];"
+      },
+      "position": [900, 300]
+    },
+    {
+      "name": "Display Results",
+      "type": "n8n-nodes-base.noOp",
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Stock Symbol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Stock Symbol": {
+      "main": [
+        [
+          {
+            "node": "Call MCP Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call MCP Server": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Display Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

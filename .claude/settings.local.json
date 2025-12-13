@@ -8,7 +8,9 @@
       "Bash(npm uninstall:*)",
       "Bash(npm install:*)",
       "Bash(ls:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)"
     ]
   }
 }
