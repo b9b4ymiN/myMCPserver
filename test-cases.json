@@ -1,0 +1,308 @@
+{
+  "testCases": {
+    "peBand": {
+      "apple": {
+        "description": "Apple PE Band Analysis",
+        "tool": "calculate_pe_band",
+        "arguments": {
+          "symbol": "AAPL",
+          "currentPrice": 170.50,
+          "eps": 6.05,
+          "historicalPEs": [25, 28, 30, 22, 20, 24, 26, 29, 31, 27, 23, 25]
+        }
+      },
+      "microsoft": {
+        "description": "Microsoft PE Band Analysis",
+        "tool": "calculate_pe_band",
+        "arguments": {
+          "symbol": "MSFT",
+          "currentPrice": 378.85,
+          "eps": 11.25,
+          "historicalPEs": [28, 32, 35, 25, 22, 30, 28, 31, 33, 29, 26, 27]
+        }
+      },
+      "zeroEps": {
+        "description": "Test case with zero EPS",
+        "tool": "calculate_pe_band",
+        "arguments": {
+          "symbol": "ZERO",
+          "currentPrice": 100,
+          "eps": 0
+        }
+      }
+    },
+    "ddm": {
+      "microsoft": {
+        "description": "Microsoft DDM Valuation",
+        "tool": "calculate_ddm",
+        "arguments": {
+          "symbol": "MSFT",
+          "currentPrice": 378.85,
+          "dividend": 2.72,
+          "requiredReturn": 0.10,
+          "growthRate": 0.05
+        }
+      },
+      "johnsonJohnson": {
+        "description": "Johnson & Johnson DDM Valuation",
+        "tool": "calculate_ddm",
+        "arguments": {
+          "symbol": "JNJ",
+          "currentPrice": 157.35,
+          "dividend": 4.52,
+          "requiredReturn": 0.08,
+          "growthRate": 0.04
+        }
+      },
+      "noDividend": {
+        "description": "Stock with no dividend",
+        "tool": "calculate_ddm",
+        "arguments": {
+          "symbol": "GOOGL",
+          "currentPrice": 141.80,
+          "dividend": 0,
+          "requiredReturn": 0.10,
+          "growthRate": 0.08
+        }
+      },
+      "errorCase": {
+        "description": "Error: Growth rate higher than required return",
+        "tool": "calculate_ddm",
+        "arguments": {
+          "symbol": "ERROR",
+          "currentPrice": 100,
+          "dividend": 5,
+          "requiredReturn": 0.05,
+          "growthRate": 0.08
+        }
+      }
+    },
+    "dcf": {
+      "google": {
+        "description": "Google DCF Valuation",
+        "tool": "calculate_dcf",
+        "arguments": {
+          "symbol": "GOOGL",
+          "currentPrice": 141.80,
+          "freeCashFlow": 60000000000,
+          "sharesOutstanding": 15000000000,
+          "growthRate": 0.08,
+          "discountRate": 0.10,
+          "years": 5
+        }
+      },
+      "nvidia": {
+        "description": "NVIDIA DCF with high growth",
+        "tool": "calculate_dcf",
+        "arguments": {
+          "symbol": "NVDA",
+          "currentPrice": 495.22,
+          "freeCashFlow": 27000000000,
+          "sharesOutstanding": 2470000000,
+          "growthRate": 0.15,
+          "discountRate": 0.10,
+          "years": 5
+        }
+      },
+      "berkshire": {
+        "description": "Berkshire Hathaway - 10 year projection",
+        "tool": "calculate_dcf",
+        "arguments": {
+          "symbol": "BRK.A",
+          "currentPrice": 540000,
+          "freeCashFlow": 100000000000,
+          "sharesOutstanding": 1500000,
+          "growthRate": 0.06,
+          "discountRate": 0.08,
+          "terminalGrowthRate": 0.025,
+          "years": 10
+        }
+      },
+      "errorNegativeFcf": {
+        "description": "Error: Negative free cash flow",
+        "tool": "calculate_dcf",
+        "arguments": {
+          "symbol": "ERROR",
+          "currentPrice": 50,
+          "freeCashFlow": -1000000,
+          "sharesOutstanding": 1000000,
+          "growthRate": 0.05,
+          "discountRate": 0.10
+        }
+      }
+    }
+  },
+  "quickTests": [
+    {
+      "name": "Apple PE",
+      "tool": "calculate_pe_band",
+      "args": {"symbol": "AAPL", "currentPrice": 170.5, "eps": 6.05}
+    },
+    {
+      "name": "MSFT DDM",
+      "tool": "calculate_ddm",
+      "args": {"symbol": "MSFT", "currentPrice": 378.85, "dividend": 2.72, "requiredReturn": 0.1, "growthRate": 0.05}
+    },
+    {
+      "name": "GOOGL DCF",
+      "tool": "calculate_dcf",
+      "args": {"symbol": "GOOGL", "currentPrice": 141.8, "freeCashFlow": 60000000000, "sharesOutstanding": 15000000000, "growthRate": 0.08, "discountRate": 0.1}
+    },
+    {
+      "name": "Fetch ADVANC Data",
+      "tool": "fetch_stock_data",
+      "args": {"symbol": "ADVANC"}
+    },
+    {
+      "name": "PTT Complete Valuation",
+      "tool": "complete_valuation",
+      "args": {"symbol": "PTT", "requiredReturn": 0.1, "growthRate": 0.05, "discountRate": 0.1, "years": 5}
+    },
+    {
+      "name": "KBANK Complete Valuation",
+      "tool": "complete_valuation",
+      "args": {"symbol": "KBANK", "requiredReturn": 0.12, "growthRate": 0.04, "discountRate": 0.12}
+    },
+    {
+      "name": "AP Income Statement",
+      "tool": "fetch_income_statement",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "AP Balance Sheet",
+      "tool": "fetch_balance_sheet",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "AP Cash Flow",
+      "tool": "fetch_cash_flow_statement",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "AP All Statements",
+      "tool": "fetch_all_financial_statements",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "AP Historical Ratios",
+      "tool": "fetch_historical_ratios",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "Analyze AP Ratios",
+      "tool": "analyze_historical_ratios",
+      "args": {"symbol": "AP", "period": "TTM"}
+    },
+    {
+      "name": "SCB Quarterly Analysis",
+      "tool": "analyze_historical_ratios",
+      "args": {"symbol": "SCB", "period": "Quarterly"}
+    }
+  ],
+  "setWatchApi": {
+    "fetchData": {
+      "description": "Fetch stock data from SET Watch API",
+      "tool": "fetch_stock_data",
+      "arguments": {
+        "symbol": "ADVANC"
+      }
+    },
+    "completeValuation": {
+      "description": "Complete valuation for SET stock",
+      "tool": "complete_valuation",
+      "arguments": {
+        "symbol": "PTT",
+        "requiredReturn": 0.1,
+        "growthRate": 0.05,
+        "discountRate": 0.1,
+        "years": 5
+      }
+    },
+    "kbankValuation": {
+      "description": "KBANK complete valuation",
+      "tool": "complete_valuation",
+      "arguments": {
+        "symbol": "KBANK",
+        "requiredReturn": 0.12,
+        "growthRate": 0.04,
+        "discountRate": 0.12
+      }
+    }
+  },
+  "financialStatements": {
+    "incomeStatement": {
+      "description": "Fetch income statement for AP",
+      "tool": "fetch_income_statement",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "balanceSheet": {
+      "description": "Fetch balance sheet for AP",
+      "tool": "fetch_balance_sheet",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "cashFlow": {
+      "description": "Fetch cash flow statement for AP",
+      "tool": "fetch_cash_flow_statement",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "allStatements": {
+      "description": "Fetch all financial statements for AP with analysis",
+      "tool": "fetch_all_financial_statements",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "quarterlyStatements": {
+      "description": "Fetch quarterly statements for SCB",
+      "tool": "fetch_all_financial_statements",
+      "arguments": {
+        "symbol": "SCB",
+        "period": "Quarterly"
+      }
+    }
+  },
+  "historicalRatios": {
+    "fetchRatios": {
+      "description": "Fetch historical ratios for AP",
+      "tool": "fetch_historical_ratios",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "analyzeRatios": {
+      "description": "Analyze historical ratios with trend analysis for AP",
+      "tool": "analyze_historical_ratios",
+      "arguments": {
+        "symbol": "AP",
+        "period": "TTM"
+      }
+    },
+    "quarterlyRatios": {
+      "description": "Fetch quarterly historical ratios for SCB",
+      "tool": "fetch_historical_ratios",
+      "arguments": {
+        "symbol": "SCB",
+        "period": "Quarterly"
+      }
+    },
+    "analyzeSCB": {
+      "description": "Complete analysis of SCB historical ratios",
+      "tool": "analyze_historical_ratios",
+      "arguments": {
+        "symbol": "SCB",
+        "period": "Quarterly"
+      }
+    }
+  }
+}

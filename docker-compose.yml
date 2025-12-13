@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  stock-valuation-mcp:
+    build: .
+    container_name: stock-valuation-server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      # SET Watch API configuration (optional - defaults will be used)
+      # - SET_WATCH_API_HOST=https://xxxxx-api.vercel.app
+      # - SET_WATCH_API_TIMEOUT=30000
+      # Custom API configuration (optional)
+      # - API_AUTH_HEADER=X-API-Key
+      # - API_AUTH_VALUE=your-api-key
+    ports:
+      - "2901:2901"
+    volumes:
+      - ./logs:/app/logs
+      # Optional: Mount custom .env file
+      # - ./.env:/app/.env:ro
+    networks:
+      - web-net
+
+networks:
+  web-net:
+    driver: bridge
