@@ -25,4 +25,4 @@ services:
 
 networks:
   web-net:
-    driver: bridge
+    external: true
