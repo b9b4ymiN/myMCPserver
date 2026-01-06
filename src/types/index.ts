@@ -427,3 +427,62 @@ export interface HistoricalRatiosAnalysis {
     overallTrend: string;
   };
 }
+
+// =====================================================
+// WEB TOOLS INTERFACES
+// =====================================================
+
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  source?: string;
+  publishedDate?: string;
+}
+
+export interface WebSearchResponse {
+  query: string;
+  totalResults: number;
+  results: WebSearchResult[];
+  searchTime: number;
+}
+
+export interface WebFetchResult {
+  url: string;
+  title: string;
+  content: string;
+  metadata: {
+    description?: string;
+    keywords?: string;
+    author?: string;
+    publishedDate?: string;
+    ogImage?: string;
+    ogTitle?: string;
+    ogDescription?: string;
+    wordCount: number;
+    fetchedAt: string;
+  };
+  links: {
+    internal: string[];
+    external: string[];
+  };
+  images: string[];
+}
+
+export interface NewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  publishedDate: string;
+  snippet: string;
+  sentiment?: 'positive' | 'negative' | 'neutral';
+  relevanceScore?: number;
+}
+
+export interface NewsSearchResponse {
+  query: string;
+  totalResults: number;
+  articles: NewsArticle[];
+  searchTime: number;
+  sources: string[];
+}

@@ -21,6 +21,7 @@ import { fetchHistoricalRatiosTool, analyzeHistoricalRatiosTool } from './tools/
 import { advancedValuationTools } from './tools/advancedValuation.js';
 import { financialAnalysisTools } from './tools/financialAnalysis.js';
 import { portfolioManagementTools } from './tools/portfolioManagement.js';
+import { webTools } from './tools/webTools.js';
 import { SERVER_CONFIG } from './config/index.js';
 
 const server = new Server(
@@ -46,7 +47,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       fetchCashFlowStatementTool,
       fetchAllFinancialStatementsTool,
       fetchHistoricalRatiosTool,
-      analyzeHistoricalRatiosTool
+      analyzeHistoricalRatiosTool,
+      ...webTools
     ].map(tool => ({
       name: tool.name,
       description: tool.description,
@@ -67,7 +69,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     fetchCashFlowStatementTool,
     fetchAllFinancialStatementsTool,
     fetchHistoricalRatiosTool,
-    analyzeHistoricalRatiosTool
+    analyzeHistoricalRatiosTool,
+    ...webTools
   ];
   const tool = allTools.find((t) => t.name === name);
   if (!tool) {
@@ -108,7 +111,8 @@ const allTools = [
   analyzeHistoricalRatiosTool,
   ...advancedValuationTools,
   ...financialAnalysisTools,
-  ...portfolioManagementTools
+  ...portfolioManagementTools,
+  ...webTools
 ];
 
 // Create Express app for HTTP endpoints
@@ -282,6 +286,9 @@ function getCategory(toolName: string): string {
   if (toolName.includes('dividend_safety')) {
     return 'Dividend Analysis';
   }
+  if (toolName.includes('web_search') || toolName.includes('web_fetch') || toolName.includes('news_search')) {
+    return 'Web & Research';
+  }
   return 'General';
 }
 
@@ -350,6 +357,27 @@ function getToolExample(toolName: string): any {
           requiredReturn: 0.10,
           growthRate: 0.05,
           discountRate: 0.10
+        }
+      };
+    case 'web_search':
+      return {
+        arguments: {
+          query: 'Apple stock price today',
+          maxResults: 10
+        }
+      };
+    case 'web_fetch':
+      return {
+        arguments: {
+          url: 'https://www.bbc.com/news/business-123456',
+          format: 'markdown'
+        }
+      };
+    case 'news_search':
+      return {
+        arguments: {
+          query: 'Tesla earnings',
+          maxResults: 10
         }
       };
     default:
