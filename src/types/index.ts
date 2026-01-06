@@ -486,3 +486,219 @@ export interface NewsSearchResponse {
   searchTime: number;
   sources: string[];
 }
+
+// =====================================================
+// UTILITY TOOLS INTERFACES (Time & Date)
+// =====================================================
+
+export interface CurrentTimeResult {
+  timezone: string;
+  currentTime: string;
+  iso: string;
+  unix: number;
+  utc: string;
+  date: {
+    year: number;
+    month: number;
+    day: number;
+  };
+  time: {
+    hour: number;
+    minute: number;
+    second: number;
+  };
+  dayOfWeek: string;
+  dayOfYear: number;
+  weekOfYear: number;
+  isDST: boolean;
+}
+
+export interface ConvertTimezoneResult {
+  originalTime: string;
+  originalTimezone: string;
+  targetTime: string;
+  targetTimezone: string;
+  timeDifference: string;
+  iso: string;
+  unix: number;
+}
+
+export interface TimeDiffResult {
+  startDate: string;
+  endDate: string;
+  difference: {
+    totalDays: number;
+    totalHours: number;
+    totalMinutes: number;
+    totalSeconds: number;
+    weeks: number;
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  };
+  humanReadable: string;
+}
+
+export interface FormatDateResult {
+  input: string;
+  formats: {
+    iso: string;
+    isoDate: string;
+    isoTime: string;
+    readable: string;
+    short: string;
+    long: string;
+    relative: string;
+  };
+  parsed: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  };
+}
+
+// =====================================================
+// FILE SYSTEM TOOLS INTERFACES
+// =====================================================
+
+export interface ReadFileResult {
+  path: string;
+  content: string;
+  encoding: string;
+  size: number;
+  lines: number;
+  success: boolean;
+  message?: string;
+}
+
+export interface WriteFileResult {
+  path: string;
+  bytesWritten: number;
+  success: boolean;
+  message?: string;
+}
+
+export interface ListDirectoryResult {
+  path: string;
+  type: 'file' | 'directory';
+  entries: Array<{
+    name: string;
+    path: string;
+    type: 'file' | 'directory' | 'symlink';
+    size?: number;
+    modified?: string;
+  }>;
+  totalCount: number;
+  success: boolean;
+  message?: string;
+}
+
+export interface FileExistsResult {
+  path: string;
+  exists: boolean;
+  type?: 'file' | 'directory' | 'symlink';
+  size?: number;
+  modified?: string;
+  created?: string;
+}
+
+export interface DeleteFileResult {
+  path: string;
+  deleted: boolean;
+  success: boolean;
+  message?: string;
+}
+
+export interface SearchFilesResult {
+  directory: string;
+  pattern: string;
+  matches: Array<{
+    path: string;
+    name: string;
+    type: 'file' | 'directory';
+  }>;
+  totalMatches: number;
+  success: boolean;
+  message?: string;
+}
+
+// =====================================================
+// MATH TOOLS INTERFACES
+// =====================================================
+
+export interface StatisticsResult {
+  data: number[];
+  count: number;
+  sum: number;
+  mean: number;
+  median: number;
+  mode: number[];
+  range: {
+    min: number;
+    max: number;
+    spread: number;
+  };
+  variance: number;
+  standardDeviation: number;
+  quartiles: {
+    q1: number;
+    q2: number;
+    q3: number;
+    iqr: number;
+  };
+  outliers: number[];
+}
+
+export interface LinearRegressionResult {
+  slope: number;
+  intercept: number;
+  correlation: number;
+  rSquared: number;
+  equation: string;
+  predictions?: number[];
+  trend: 'increasing' | 'decreasing' | 'neutral';
+}
+
+export interface CompoundInterestResult {
+  principal: number;
+  rate: number;
+  time: number;
+  frequency: number;
+  finalAmount: number;
+  totalInterest: number;
+  effectiveRate: number;
+  schedule?: Array<{
+    period: number;
+    balance: number;
+    interest: number;
+  }>;
+}
+
+export interface CurrencyConvertResult {
+  amount: number;
+  from: string;
+  to: string;
+  rate?: number;
+  converted?: number;
+  note: string;
+}
+
+export interface LoanCalculatorResult {
+  principal: number;
+  annualRate: number;
+  years: number;
+  monthlyPayment: number;
+  totalPayment: number;
+  totalInterest: number;
+  schedule?: Array<{
+    month: number;
+    payment: number;
+    principal: number;
+    interest: number;
+    balance: number;
+  }>;
+}

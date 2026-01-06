@@ -22,6 +22,9 @@ import { advancedValuationTools } from './tools/advancedValuation.js';
 import { financialAnalysisTools } from './tools/financialAnalysis.js';
 import { portfolioManagementTools } from './tools/portfolioManagement.js';
 import { webTools } from './tools/webTools.js';
+import { utilityTools } from './tools/utilityTools.js';
+import { fileSystemTools } from './tools/fileSystemTools.js';
+import { mathTools } from './tools/mathTools.js';
 import { SERVER_CONFIG } from './config/index.js';
 
 const server = new Server(
@@ -48,7 +51,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       fetchAllFinancialStatementsTool,
       fetchHistoricalRatiosTool,
       analyzeHistoricalRatiosTool,
-      ...webTools
+      ...webTools,
+      ...utilityTools,
+      ...fileSystemTools,
+      ...mathTools
     ].map(tool => ({
       name: tool.name,
       description: tool.description,
@@ -70,7 +76,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     fetchAllFinancialStatementsTool,
     fetchHistoricalRatiosTool,
     analyzeHistoricalRatiosTool,
-    ...webTools
+    ...webTools,
+    ...utilityTools,
+    ...fileSystemTools,
+    ...mathTools
   ];
   const tool = allTools.find((t) => t.name === name);
   if (!tool) {
@@ -112,7 +121,10 @@ const allTools = [
   ...advancedValuationTools,
   ...financialAnalysisTools,
   ...portfolioManagementTools,
-  ...webTools
+  ...webTools,
+  ...utilityTools,
+  ...fileSystemTools,
+  ...mathTools
 ];
 
 // Create Express app for HTTP endpoints
@@ -289,6 +301,17 @@ function getCategory(toolName: string): string {
   if (toolName.includes('web_search') || toolName.includes('web_fetch') || toolName.includes('news_search')) {
     return 'Web & Research';
   }
+  if (toolName.includes('current_time') || toolName.includes('timezone') || toolName.includes('time_diff') || toolName.includes('format_datetime')) {
+    return 'Time & Date';
+  }
+  if (toolName.includes('read_file') || toolName.includes('write_file') || toolName.includes('list_directory') ||
+      toolName.includes('file_exists') || toolName.includes('delete_file') || toolName.includes('search_files')) {
+    return 'File System';
+  }
+  if (toolName.includes('statistics') || toolName.includes('regression') || toolName.includes('compound_interest') ||
+      toolName.includes('currency') || toolName.includes('loan')) {
+    return 'Math & Calculations';
+  }
   return 'General';
 }
 
@@ -378,6 +401,87 @@ function getToolExample(toolName: string): any {
         arguments: {
           query: 'Tesla earnings',
           maxResults: 10
+        }
+      };
+    case 'get_current_time':
+      return {
+        arguments: {
+          timezone: 'Asia/Bangkok',
+          format: 'all'
+        }
+      };
+    case 'convert_timezone':
+      return {
+        arguments: {
+          datetime: '2024-01-15 14:30',
+          fromTimezone: 'UTC',
+          toTimezone: 'America/New_York'
+        }
+      };
+    case 'calculate_time_diff':
+      return {
+        arguments: {
+          startDate: '2024-01-01',
+          endDate: '2024-01-15'
+        }
+      };
+    case 'read_file':
+      return {
+        arguments: {
+          filePath: './package.json'
+        }
+      };
+    case 'write_file':
+      return {
+        arguments: {
+          filePath: './output.txt',
+          content: 'Hello, World!'
+        }
+      };
+    case 'list_directory':
+      return {
+        arguments: {
+          dirPath: './src',
+          recursive: false
+        }
+      };
+    case 'search_files':
+      return {
+        arguments: {
+          directory: './src',
+          pattern: '*.ts',
+          recursive: true
+        }
+      };
+    case 'calculate_statistics':
+      return {
+        arguments: {
+          data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        }
+      };
+    case 'calculate_compound_interest':
+      return {
+        arguments: {
+          principal: 10000,
+          rate: 0.05,
+          time: 5,
+          frequency: 12
+        }
+      };
+    case 'convert_currency':
+      return {
+        arguments: {
+          amount: 100,
+          from: 'USD',
+          to: 'THB'
+        }
+      };
+    case 'calculate_loan':
+      return {
+        arguments: {
+          principal: 500000,
+          annualRate: 0.05,
+          years: 30
         }
       };
     default:
