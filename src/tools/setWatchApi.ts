@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { SetWatchData, Tool } from '../types/index.js';
 import { API_CONFIG } from '../config/index.js';
+import { ToolCategory } from '../types/tool-descriptions.js';
 
 // Fetch stock data from SET Watch API
 export async function fetchSetWatchData(symbol: string): Promise<SetWatchData> {
@@ -23,10 +24,53 @@ export async function fetchSetWatchData(symbol: string): Promise<SetWatchData> {
   }
 }
 
+// =====================================================
+// STOCK DATA FETCHING TOOL
+// Fetch comprehensive stock data from SET Watch API
+// =====================================================
+
 // Tool to fetch stock data
 export const fetchStockDataTool: Tool = {
   name: 'fetch_stock_data',
-  description: 'Fetch real-time stock data from SET Watch API for Thai stocks',
+  description: `Fetch real-time comprehensive stock data from SET Watch API for Thai stocks listed on the Stock Exchange of Thailand.
+
+**Use Case:** ${ToolCategory.DATA_FETCHING} - Get current stock data including price, ratios, financial metrics, and market data.
+
+**Best For:**
+- Thai stock analysis (SET market)
+- Getting current stock metrics and ratios
+- Preparing data for valuation models
+- Quick stock data lookup
+- Portfolio data updates
+
+**Inputs:**
+- symbol: Stock symbol without .BK suffix (e.g., "ADVANC", "SCB", "KBANK")
+
+**Outputs:**
+- symbol: Stock symbol with .BK suffix
+- currentPrice: Current market price (calculated from PE × EPS)
+- eps: Earnings per share
+- dividend: Dividend per share
+- marketCap: Market capitalization
+- Key Ratios: PE, PB, PS, dividend yield, ROE, beta
+- Profitability: Gross margin, operating margin, profit margin
+- Financial Health: Current ratio, quick ratio, debt-to-equity
+- Scores: Altman Z-Score, Piotroski F-Score
+
+**Data Fields (70+ metrics):**
+- Valuation: PE, PB, PS, PEG, EV/EBITDA, EV/Sales, EV/FCF
+- Profitability: ROE, ROA, ROIC, margins
+- Financial Health: Current ratio, quick ratio, debt-to-equity, interest coverage
+- Cash Flow: Operating CF, free CF, FCF yield
+- Dividend: Yield, growth, payout ratio, shareholder yield
+- Technical: Beta, 52-week change, moving averages, RSI
+
+**Prerequisites:** None - this is typically the first tool to call
+
+**Related Tools:** complete_valuation, calculate_pe_band, calculate_dcf, calculate_ddm
+**DataSource:** ${API_CONFIG.SET_WATCH.HOST}/mypick/snapStatistics/
+**ExecutionTime:** 1-3 seconds
+**Caching:** 5 minutes TTL (price data changes frequently)`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -76,10 +120,78 @@ export const fetchStockDataTool: Tool = {
   }
 };
 
+// =====================================================
+// COMPLETE VALUATION TOOL
+// Fetch data and run all valuation models at once
+// =====================================================
+
 // Tool to run complete valuation with fetched data
 export const completeValuationTool: Tool = {
   name: 'complete_valuation',
-  description: 'Fetch stock data and run all valuation models (PE Band, DDM, DCF)',
+  description: `Fetch stock data and run all major valuation models (PE Band, DDM, DCF) in a single call. Provides comprehensive valuation analysis with overall recommendation.
+
+**Use Case:** ${ToolCategory.VALUATION} - Complete end-to-end stock valuation with multiple models for comprehensive analysis.
+
+**Best For:**
+- Comprehensive stock analysis
+- Investment decision support
+- Quick valuation overview
+- Comparing multiple valuation methods
+- Generating investment reports
+
+**Inputs:**
+- symbol: Stock symbol without .BK suffix (e.g., "PTT", "AOT", "BDMS")
+- requiredReturn: Required rate of return for DDM (default: 0.10 = 10%)
+- growthRate: Growth rate for DDM and DCF (default: 0.05 = 5%)
+- discountRate: Discount rate/WACC for DCF (default: 0.10 = 10%)
+- years: Number of years for DCF projection (default: 5)
+
+**Outputs:**
+- symbol: Stock symbol with .BK suffix
+- currentPrice: Current market price
+- lastUpdated: Timestamp of analysis
+- data: Key metrics (marketCap, EPS, PE, PB, dividendYield, ROE, beta)
+
+**Valuation Models:**
+1. **PE Band Analysis:** Historical PE range valuation
+   - currentPE, averagePE, minPE, maxPE
+   - fairValueRange (lower/upper)
+   - recommendation: Undervalued/Fairly Valued/Overvalued
+
+2. **DDM Valuation:** (if dividend > 0)
+   - Intrinsic value from Gordon Growth Model
+   - marginOfSafety
+   - recommendation: Buy/Hold/Sell
+
+3. **DCF Valuation:**
+   - 5-year FCF projections
+   - Terminal value calculation
+   - NPV and intrinsic value per share
+   - marginOfSafety
+   - Year-by-year projections
+
+4. **Margin of Safety:**
+   - Average intrinsic value across methods
+   - Overall margin of safety percentage
+   - riskLevel: Very Low/Low/Medium/High/Very High
+   - recommendation: Strong Buy/Buy/Hold/Sell/Strong Sell
+
+**Overall Recommendation:**
+- Combines signals from all valuation models
+- Provides single investment decision
+- Includes comprehensive summary
+
+**Workflow:**
+1. Fetches stock data from SET Watch API
+2. Runs PE Band, DDM (if applicable), DCF valuations
+3. Calculates margin of safety
+4. Aggregates recommendations
+5. Returns comprehensive analysis
+
+**Related Tools:** fetch_stock_data, calculate_margin_of_safety, calculate_financial_health_score
+**DataSource:** SET Watch API + Calculated valuations
+**ExecutionTime:** 3-5 seconds
+**Caching:** 5 minutes TTL`,
   inputSchema: {
     type: 'object',
     properties: {

@@ -2,9 +2,11 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { Tool } from '../types/index.js';
 import { API_CONFIG } from '../config/index.js';
+import { ToolCategory } from '../types/tool-descriptions.js';
 
 // =====================================================
 // WEB SEARCH TOOL (DuckDuckGo - Free, No API Key)
+// Search the web for current information and research
 // =====================================================
 
 interface WebSearchResult {
@@ -24,7 +26,33 @@ interface WebSearchResponse {
 
 const webSearchTool: Tool = {
   name: 'web_search',
-  description: 'Search the web using DuckDuckGo for information, news, and research. Free search without API key requirements.',
+  description: `Search the web using DuckDuckGo for current information, news, and research. Free search without API key requirements.
+
+**Use Case:** ${ToolCategory.WEB_RESEARCH} - Find current information, news, and research on any topic.
+
+**Best For:**
+- Stock news and market updates
+- Company research and announcements
+- Economic indicator lookup
+- Industry trend analysis
+- Real-time information gathering
+
+**Inputs:**
+- query: Search query (e.g., "Apple stock price", "Tesla earnings 2024")
+- maxResults: Maximum number of results (default: 10, range: 1-50)
+- timeRange: Time filter for results (default: "all")
+  Options: "all" | "day" | "week" | "month" | "year"
+- safeSearch: Enable safe search filter (default: true)
+
+**Outputs:**
+- results: Array of search results with title, URL, and snippet
+- totalResults: Number of results returned
+- searchTime: Time taken to search in milliseconds
+
+**Related Tools:** news_search, web_fetch
+**DataSource:** DuckDuckGo (web scraping)
+**ExecutionTime:** 1-3 seconds
+**Caching:** 15 minutes TTL for repeated queries`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -118,6 +146,7 @@ const webSearchTool: Tool = {
 
 // =====================================================
 // WEB FETCH TOOL - Extract content from URLs
+// Fetch and extract clean content from web pages
 // =====================================================
 
 interface WebFetchResult {
@@ -144,7 +173,42 @@ interface WebFetchResult {
 
 const webFetchTool: Tool = {
   name: 'web_fetch',
-  description: 'Fetch and extract readable content from a web page. Removes ads, navigation, and clutter to get clean content.',
+  description: `Fetch and extract readable content from a web page. Automatically removes ads, navigation, and clutter to get clean, structured content.
+
+**Use Case:** ${ToolCategory.WEB_RESEARCH} - Extract main content from articles, blog posts, and news pages for analysis.
+
+**Best For:**
+- Reading financial articles and earnings reports
+- Extracting content from news sites
+- Getting clean text from blog posts
+- Research and documentation gathering
+- Content analysis and summarization
+
+**Inputs:**
+- url: URL to fetch content from (e.g., "https://www.bbc.com/news/business-123456")
+- includeLinks: Include links found on the page (default: false)
+- includeImages: Include images found on the page (default: false)
+- format: Output format (default: "text")
+  Options: "text" | "markdown" | "html"
+
+**Outputs:**
+- url: Final URL (after redirects)
+- title: Page title
+- content: Main content in requested format
+- metadata: Page metadata (description, author, published date, word count, etc.)
+- links: Internal and external links (if requested)
+- images: Image URLs (if requested)
+
+**Features:**
+- Automatically removes ads, navigation, footers, sidebars
+- Extracts main article content
+- Supports multiple output formats
+- Follows redirects
+
+**Related Tools:** web_search, news_search
+**DataSource:** Direct HTTP fetch
+**ExecutionTime:** 2-5 seconds
+**Caching:** 15 minutes TTL`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -315,6 +379,7 @@ const webFetchTool: Tool = {
 
 // =====================================================
 // NEWS SEARCH TOOL - Financial & Stock News
+// Search recent news articles and financial headlines
 // =====================================================
 
 interface NewsArticle {
@@ -337,7 +402,44 @@ interface NewsSearchResponse {
 
 const newsSearchTool: Tool = {
   name: 'news_search',
-  description: 'Search for recent news articles, perfect for stock news, company announcements, and financial headlines. Searches Google News.',
+  description: `Search for recent news articles using Google News RSS. Perfect for stock news, company announcements, earnings reports, and financial headlines.
+
+**Use Case:** ${ToolCategory.WEB_RESEARCH} - Find recent news articles and company updates for investment research.
+
+**Best For:**
+- Stock news and earnings updates
+- Company announcements and press releases
+- Financial market news
+- Industry news and trends
+- Merger and acquisition news
+
+**Inputs:**
+- query: News search query (e.g., "Apple stock", "Tesla earnings", "Fed interest rates")
+- maxResults: Maximum number of articles (default: 10, range: 1-30)
+- source: Specific news source to search (optional, e.g., "bloomberg.com", "reuters.com")
+- language: Language for articles (default: "en")
+  Options: "en" | "th" | "zh" | "ja" | "ko" | "de" | "fr" | "es"
+- sortBy: Sort order (default: "relevance")
+  Options: "relevance" | "date"
+
+**Outputs:**
+- articles: Array of news articles with title, URL, source, published date
+- sentiment: Basic sentiment analysis (positive/negative/neutral)
+- sources: List of unique sources found
+- totalResults: Number of articles returned
+- searchTime: Time taken to search
+
+**Features:**
+- Google News RSS integration (free, no API key)
+- Multi-language support
+- Source filtering
+- Sentiment analysis on headlines
+- Date-based sorting
+
+**Related Tools:** web_search, web_fetch, fetch_stock_data
+**DataSource:** Google News RSS feed
+**ExecutionTime:** 1-2 seconds
+**Caching:** 10 minutes TTL for news (expires faster due to time sensitivity)`,
   inputSchema: {
     type: 'object',
     properties: {

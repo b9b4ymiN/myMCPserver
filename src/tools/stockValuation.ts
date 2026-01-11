@@ -1,4 +1,5 @@
 import { StockData, PEBandResult, DDMResult, DCFResult, MarginOfSafetyResult, Tool } from '../types/index.js';
+import { ToolCategory } from '../types/tool-descriptions.js';
 
 // Helper functions
 function calculatePE(price: number, eps: number): number {
@@ -15,10 +16,40 @@ function calculatePercentile(value: number, array: number[]): number {
   return (index / (sorted.length - 1)) * 100;
 }
 
+// =====================================================
 // PE Band Calculation Tool
+// Calculates PE band valuation using historical PE ratios
+// Best for: Value investing, Thai stocks, PE-based valuation
+// =====================================================
 const peBandTool: Tool = {
   name: 'calculate_pe_band',
-  description: 'Calculate PE band valuation for a stock',
+  description: `Calculate PE band valuation for a stock using historical PE ratios.
+
+**Use Case:** ${ToolCategory.VALUATION} - Determine if a stock is undervalued, fairly valued, or overvalued based on historical PE ranges.
+
+**Best For:**
+- Thai stocks (SET market)
+- Value investing decisions
+- Quick PE-based valuation check
+- Comparing current valuation to historical norms
+
+**Inputs:**
+- symbol: Stock ticker (e.g., "AAPL", "SCB")
+- currentPrice: Current market price per share
+- eps: Earnings per share (TTM)
+- historicalPEs: Optional array of historical PE ratios (uses Thai market defaults if not provided)
+
+**Outputs:**
+- currentPE: Calculated PE ratio
+- averagePE, minPE, maxPE: Historical PE statistics
+- pePercentile: Current PE's percentile in historical range
+- fairValueRange: Lower and upper fair value prices
+- recommendation: "Undervalued" | "Fairly Valued" | "Overvalued"
+- analysis: Text explanation of the valuation
+
+**Related Tools:** calculate_margin_of_safety, calculate_dcf, fetch_stock_data
+**DataSource:** Calculated from inputs
+**ExecutionTime:** < 100ms`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -92,10 +123,46 @@ const peBandTool: Tool = {
   }
 };
 
-// DDM Calculation Tool
+// =====================================================
+// DDM (Dividend Discount Model) Calculation Tool
+// Calculates intrinsic value using Gordon Growth Model
+// Best for: Dividend-paying stocks, income investing
+// =====================================================
 const ddmTool: Tool = {
   name: 'calculate_ddm',
-  description: 'Calculate Dividend Discount Model valuation',
+  description: `Calculate Dividend Discount Model (DDM) valuation using the Gordon Growth Model.
+
+**Use Case:** ${ToolCategory.VALUATION} - Estimate intrinsic value for dividend-paying stocks.
+
+**Best For:**
+- Dividend-paying stocks (companies with consistent dividends)
+- Income investing analysis
+- Stable, mature companies
+- REITs and utilities
+
+**Inputs:**
+- symbol: Stock ticker (e.g., "AAPL", "SCB")
+- currentPrice: Current market price per share
+- dividend: Annual dividend per share
+- requiredReturn: Required rate of return as decimal (e.g., 0.10 for 10%)
+- growthRate: Expected dividend growth rate as decimal (e.g., 0.05 for 5%)
+
+**Outputs:**
+- intrinsicValue: Calculated fair value per share
+- marginOfSafety: Percentage difference between price and intrinsic value
+- recommendation: "Buy" | "Hold" | "Sell"
+- analysis: Text explanation with margin of safety details
+
+**Formula:** P = D1 / (r - g) where D1 = D * (1 + g)
+
+**Important Notes:**
+- Required return must be greater than growth rate
+- Dividend cannot be negative
+- Best for companies with stable dividend growth
+
+**Related Tools:** calculate_margin_of_safety, calculate_pe_band, dividend_safety_analysis
+**DataSource:** Calculated from inputs
+**ExecutionTime:** < 50ms`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -159,10 +226,50 @@ const ddmTool: Tool = {
   }
 };
 
-// DCF Calculation Tool
+// =====================================================
+// DCF (Discounted Cash Flow) Calculation Tool
+// Projects future cash flows and discounts to present value
+// Best for: Companies with predictable cash flows
+// =====================================================
 const dcfTool: Tool = {
   name: 'calculate_dcf',
-  description: 'Calculate Discounted Cash Flow valuation',
+  description: `Calculate Discounted Cash Flow (DCF) valuation by projecting future free cash flows and discounting to present value.
+
+**Use Case:** ${ToolCategory.VALUATION} - Comprehensive intrinsic value calculation based on cash flow generation.
+
+**Best For:**
+- Companies with predictable cash flows
+- Growth companies (non-dividend payers)
+- Manufacturing, technology, service companies
+- Long-term valuation analysis
+
+**Inputs:**
+- symbol: Stock ticker (e.g., "AAPL", "SCB")
+- currentPrice: Current market price per share
+- freeCashFlow: Annual free cash flow in base currency
+- sharesOutstanding: Number of shares outstanding
+- years: Projection period (default: 5 years, range: 3-10)
+- growthRate: FCF growth rate during projection period as decimal (e.g., 0.05 for 5%)
+- discountRate: WACC/discount rate as decimal (e.g., 0.10 for 10%)
+- terminalGrowthRate: Terminal growth rate as decimal (default: 0.025 for 2.5%)
+
+**Outputs:**
+- intrinsicValue: Calculated fair value per share
+- marginOfSafety: Percentage difference between price and intrinsic value
+- npv: Net present value of projected cash flows
+- recommendation: "Buy" | "Hold" | "Sell"
+- projections: Year-by-year projection details
+- analysis: Text explanation of the DCF valuation
+
+**Validation Rules:**
+- Free cash flow must be positive
+- Shares outstanding must be positive
+- Discount rate must be greater than terminal growth rate
+- Growth rate should be reasonable (typically 0-20%)
+
+**Related Tools:** calculate_margin_of_safety, fetch_stock_data, calculate_pe_band
+**DataSource:** Calculated from inputs
+**ExecutionTime:** < 100ms`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -266,10 +373,57 @@ const dcfTool: Tool = {
   }
 };
 
+// =====================================================
 // Margin of Safety Calculation Tool
+// Assess downside protection for value investing
+// Best for: All value investing decisions
+// =====================================================
 const marginOfSafetyTool: Tool = {
   name: 'calculate_margin_of_safety',
-  description: 'Calculate Margin of Safety for value investing decisions',
+  description: `Calculate Margin of Safety (MoS) to assess downside protection - a key concept in value investing popularized by Benjamin Graham and Warren Buffett.
+
+**Use Case:** ${ToolCategory.VALUATION} - Evaluate the buffer between current price and intrinsic value to protect against errors in analysis.
+
+**Best For:**
+- All value investing decisions
+- Risk assessment and position sizing
+- Determining appropriate entry points
+- Portfolio risk management
+
+**Inputs:**
+- symbol: Stock ticker (e.g., "AAPL", "SCB")
+- currentPrice: Current market price per share
+- intrinsicValue: Calculated intrinsic value from valuation models
+- valuationMethod: Method used (default: "Multiple Methods Average")
+  Options: "DCF" | "DDM" | "PE Band" | "Asset-Based" | "Multiple Methods Average"
+- riskAdjustment: Risk adjustment factor (default: 1.0, range: 0.5-1.5)
+  - 0.8 = High risk (conservative)
+  - 1.0 = Normal risk
+  - 1.2 = Low risk (aggressive)
+
+**Outputs:**
+- marginOfSafety: Absolute price difference
+- marginOfSafetyPercentage: Percentage margin of safety
+- recommendation: "Strong Buy" | "Buy" | "Hold" | "Sell" | "Strong Sell"
+- riskLevel: "Very Low" | "Low" | "Medium" | "High" | "Very High"
+- analysis: Detailed explanation with value investing context
+- principlesCheck: Verification against value investing principles
+
+**Interpretation:**
+- ≥ 50% MoS: Strong Buy (Very Low risk)
+- ≥ 30% MoS: Buy (Low risk)
+- ≥ 10% MoS: Hold (Medium risk)
+- ≥ -10% MoS: Sell (High risk)
+- < -10% MoS: Strong Sell (Very High risk)
+
+**Value Investing Principles:**
+- Buy only when price is significantly below intrinsic value
+- Margin of safety protects against analysis errors
+- Larger margin = lower risk = higher potential returns
+
+**Related Tools:** calculate_pe_band, calculate_dcf, calculate_ddm, fetch_stock_data
+**DataSource:** Calculated from inputs
+**ExecutionTime:** < 50ms`,
   inputSchema: {
     type: 'object',
     properties: {
