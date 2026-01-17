@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "project": "MCP Stock Analysis Server",
+  "agents": {
+    "dev": {
+      "name": "DevBot",
+      "type": "AI Development Agent",
+      "configPath": "agents/ai-dev-agent.md",
+      "model": "claude-sonnet-4-5-20250114",
+      "temperature": 0.3,
+      "maxTokens": 8000,
+      "tools": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "search_code",
+        "run_tests",
+        "build_project",
+        "lint_code",
+        "git_operations"
+      ]
+    },
+    "qa": {
+      "name": "QABot",
+      "type": "AI QA Agent",
+      "configPath": "agents/ai-qa-agent.md",
+      "model": "claude-sonnet-4-5-20250114",
+      "temperature": 0.2,
+      "maxTokens": 8000,
+      "tools": [
+        "run_unit_tests",
+        "validate_smartresponse",
+        "test_api_endpoint",
+        "measure_coverage",
+        "lint_check",
+        "type_check"
+      ]
+    }
+  },
+  "shared": {
+    "projectRoot": ".",
+    "srcDir": "src",
+    "testDir": "tests",
+    "agentLogDir": "agents/logs"
+  }
+}

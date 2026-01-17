@@ -2,25 +2,92 @@ import axios from 'axios';
 import { SetWatchData, Tool } from '../types/index.js';
 import { API_CONFIG } from '../config/index.js';
 import { ToolCategory } from '../types/tool-descriptions.js';
+import { SmartResponse, DataQuality, Completeness } from '../types/responses.js';
 
-// Fetch stock data from SET Watch API
+// =====================================================
+// DATA VALIDATION & ERROR HANDLING
+// =====================================================
+
+/**
+ * Validate and normalize stock symbol
+ */
+function validateSymbol(symbol: string): string {
+  if (!symbol || typeof symbol !== 'string') {
+    throw new Error('Symbol must be a non-empty string');
+  }
+
+  // Remove .BK suffix if present and convert to uppercase
+  const normalized = symbol.replace(/\.BK$/i, '').trim().toUpperCase();
+
+  if (normalized.length < 2 || normalized.length > 6) {
+    throw new Error(`Invalid symbol format: "${symbol}". Thai stock symbols are 2-6 letters (e.g., "ADVANC", "SCB", "KBANK")`);
+  }
+
+  if (!/^[A-Z]+$/.test(normalized)) {
+    throw new Error(`Invalid symbol: "${symbol}". Must contain only letters`);
+  }
+
+  return normalized;
+}
+
+/**
+ * Validate numeric value and provide default
+ */
+function safeNumber(value: any, defaultValue: number = 0): number {
+  if (value === null || value === undefined || isNaN(value)) {
+    return defaultValue;
+  }
+  return Number(value);
+}
+
+/**
+ * Validate that a required numeric value exists
+ */
+function requireNumber(value: any, fieldName: string, symbol: string): number {
+  if (value === null || value === undefined || isNaN(value) || value === 0) {
+    throw new Error(`Invalid ${fieldName} for ${symbol}: value is ${value === null ? 'null' : value === undefined ? 'undefined' : value}. This stock may not have this data available.`);
+  }
+  return Number(value);
+}
+
+// =====================================================
+// API FETCH FUNCTION
+// =====================================================
+
+/**
+ * Fetch stock data from SET Watch API with validation
+ */
 export async function fetchSetWatchData(symbol: string): Promise<SetWatchData> {
-  const url = `${API_CONFIG.SET_WATCH.HOST}/mypick/snapStatistics/${symbol}.BK`;
+  // Validate and normalize symbol
+  const validatedSymbol = validateSymbol(symbol);
+  const url = `${API_CONFIG.SET_WATCH.HOST}/mypick/snapStatistics/${validatedSymbol}.BK`;
 
   try {
     const response = await axios.get<SetWatchData>(url, {
       timeout: API_CONFIG.SET_WATCH.TIMEOUT,
       headers: API_CONFIG.SET_WATCH.HEADERS
     });
+
+    // Validate response data
+    if (!response.data) {
+      throw new Error(`Empty response data for ${validatedSymbol}`);
+    }
+
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 404) {
-        throw new Error(`Stock symbol ${symbol} not found`);
+        throw new Error(`Stock symbol "${validatedSymbol}" not found. Please check the symbol is correct and listed on SET (Thai stock exchange).`);
       }
-      throw new Error(`Failed to fetch data for ${symbol}: ${error.message}`);
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error(`Request timeout for ${validatedSymbol}. The API may be slow or unreachable. Please try again.`);
+      }
+      if (error.response?.status === 500) {
+        throw new Error(`Server error for ${validatedSymbol}. The API is experiencing issues. Please try again later.`);
+      }
+      throw new Error(`Failed to fetch data for "${validatedSymbol}": ${error.message}`);
     }
-    throw new Error(`Unexpected error fetching data for ${symbol}`);
+    throw new Error(`Unexpected error fetching data for "${validatedSymbol}"`);
   }
 }
 
@@ -44,7 +111,7 @@ export const fetchStockDataTool: Tool = {
 - Portfolio data updates
 
 **Inputs:**
-- symbol: Stock symbol without .BK suffix (e.g., "ADVANC", "SCB", "KBANK")
+- symbol: Stock symbol without .BK suffix (e.g., "ADVANC", "SCB", "KBANK"). Accepts lowercase, uppercase, or with .BK suffix.
 
 **Outputs:**
 - symbol: Stock symbol with .BK suffix
@@ -65,6 +132,11 @@ export const fetchStockDataTool: Tool = {
 - Dividend: Yield, growth, payout ratio, shareholder yield
 - Technical: Beta, 52-week change, moving averages, RSI
 
+**Notes:**
+- Symbol is automatically validated and converted to uppercase
+- Accepts symbols with or without .BK suffix (e.g., "advanc", "ADVANC", "advanc.bk" all work)
+- Returns null/0 for missing data fields
+
 **Prerequisites:** None - this is typically the first tool to call
 
 **Related Tools:** complete_valuation, calculate_pe_band, calculate_dcf, calculate_ddm
@@ -76,7 +148,7 @@ export const fetchStockDataTool: Tool = {
     properties: {
       symbol: {
         type: 'string',
-        description: 'Stock symbol without .BK suffix (e.g., "ADVANC" for ADVANC.BK)'
+        description: 'Stock symbol (e.g., "ADVANC", "SCB", "KBANK"). Case-insensitive, .BK suffix optional.'
       }
     },
     required: ['symbol']
@@ -85,40 +157,164 @@ export const fetchStockDataTool: Tool = {
     const { symbol } = args;
 
     try {
+      // Fetch data (includes validation)
       const data = await fetchSetWatchData(symbol);
 
-      // Calculate current price from PE ratio and EPS
-      const currentPrice = data.peRatio * data.eps;
+      // Validate required fields for price calculation
+      const eps = requireNumber(data.eps, 'EPS', symbol);
+      const peRatio = requireNumber(data.peRatio, 'PE ratio', symbol);
 
-      return {
-        symbol: `${symbol}.BK`,
+      // Calculate current price from PE ratio and EPS
+      const currentPrice = peRatio * eps;
+
+      // Use safeNumber for optional fields (null becomes 0)
+      const stockData = {
+        symbol: `${validateSymbol(symbol)}.BK`,
         currentPrice,
-        eps: data.eps,
-        dividend: data.dividendPerShare,
-        freeCashFlow: data.freeCashFlow,
-        sharesOutstanding: data.sharesOutstanding,
-        marketCap: data.marketCap,
-        peRatio: data.peRatio,
-        pbRatio: data.pbRatio,
-        psRatio: data.psRatio,
-        dividendYield: data.dividendYield,
-        roe: data.returnOnEquity,
-        beta: data.beta5Y,
-        debtToEquity: data.debtToEquity,
-        currentRatio: data.currentRatio,
-        quickRatio: data.quickRatio,
-        grossMargin: data.grossMargin,
-        operatingMargin: data.operatingMargin,
-        profitMargin: data.profitMargin,
-        altmanZScore: data.altmanZScore,
-        piotroskiFScore: data.piotroskiFScore,
+        eps: eps,
+        dividend: safeNumber(data.dividendPerShare),
+        freeCashFlow: safeNumber(data.freeCashFlow),
+        sharesOutstanding: requireNumber(data.sharesOutstanding, 'shares outstanding', symbol),
+        marketCap: safeNumber(data.marketCap),
+        peRatio: peRatio,
+        pbRatio: safeNumber(data.pbRatio),
+        psRatio: safeNumber(data.psRatio),
+        dividendYield: safeNumber(data.dividendYield),
+        roe: safeNumber(data.returnOnEquity),
+        beta: safeNumber(data.beta5Y),
+        debtToEquity: safeNumber(data.debtToEquity),
+        currentRatio: safeNumber(data.currentRatio),
+        quickRatio: safeNumber(data.quickRatio),
+        grossMargin: safeNumber(data.grossMargin),
+        operatingMargin: safeNumber(data.operatingMargin),
+        profitMargin: safeNumber(data.profitMargin),
+        altmanZScore: safeNumber(data.altmanZScore),
+        piotroskiFScore: safeNumber(data.piotroskiFScore),
         rawData: data
       };
+
+      return formatStockDataResponse(stockData);
     } catch (error) {
       throw new Error(`Failed to fetch stock data: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 };
+
+/**
+ * Format stock data as SmartResponse
+ */
+function formatStockDataResponse(data: any): SmartResponse<any> {
+  const { symbol, currentPrice, eps, peRatio, pbRatio, dividendYield, roe, debtToEquity, altmanZScore, piotroskiFScore, beta } = data;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Build key findings
+  keyFindings.push(`Current Price: ฿${currentPrice.toFixed(2)}`);
+  keyFindings.push(`PE Ratio: ${peRatio.toFixed(2)} | PB Ratio: ${pbRatio.toFixed(2)}`);
+  keyFindings.push(`ROE: ${roe.toFixed(1)}% | Dividend Yield: ${dividendYield.toFixed(2)}%`);
+  keyFindings.push(`Debt-to-Equity: ${debtToEquity.toFixed(2)} | Beta: ${beta.toFixed(2)}`);
+
+  // Financial health assessment
+  if (altmanZScore > 0) {
+    if (altmanZScore >= 3) {
+      keyFindings.push(`✓ Strong financial health (Altman Z-Score: ${altmanZScore.toFixed(2)})`);
+    } else if (altmanZScore >= 1.8) {
+      warnings.push(`Moderate financial health (Altman Z-Score: ${altmanZScore.toFixed(2)})`);
+    } else {
+      warnings.push(`⚠ Weak financial health (Altman Z-Score: ${altmanZScore.toFixed(2)})`);
+    }
+  }
+
+  // ROE assessment
+  if (roe > 15) {
+    keyFindings.push(`✓ Excellent profitability (ROE: ${roe.toFixed(1)}%)`);
+  } else if (roe < 8) {
+    warnings.push(`⚠ Low ROE (${roe.toFixed(1)}%)`);
+  }
+
+  // Determine action
+  let action: 'Buy' | 'Sell' | 'Hold' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (peRatio > 0) {
+    if (peRatio < 12 && roe > 15) {
+      action = 'Buy';
+      priority = 'Medium';
+      confidence = 'Medium';
+    } else if (peRatio > 25) {
+      action = 'Sell';
+      priority = 'Medium';
+      confidence = 'Medium';
+    }
+  }
+
+  return {
+    summary: {
+      title: `Stock Data - ${symbol}`,
+      what: `Comprehensive stock data and metrics from SET Watch API`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: {
+      summary: {
+        symbol,
+        currentPrice: `฿${currentPrice.toFixed(2)}`,
+        currency: 'THB',
+        exchange: 'SET'
+      },
+      valuation: {
+        peRatio,
+        pbRatio,
+        dividendYield,
+        roe
+      },
+      health: {
+        altmanZScore,
+        piotroskiFScore,
+        currentRatio: data.currentRatio,
+        debtToEquity
+      },
+      technical: {
+        beta,
+        priceChange52W: data.priceChange52W || 0,
+        rsi: data.rsi || 0
+      },
+      rawData: data
+    },
+    metadata: {
+      tool: 'fetch_stock_data',
+      category: 'Data Fetching',
+      dataSource: 'SET Watch API',
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: DataQuality.HIGH,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations: {
+      investment: action,
+      priority,
+      reasoning: `Based on PE ratio of ${peRatio.toFixed(2)} and ROE of ${roe.toFixed(1)}%`,
+      nextSteps: action === 'Buy'
+        ? ['Run valuation models', 'Check financial statements', 'Verify earnings quality']
+        : action === 'Sell'
+        ? ['Consider taking profits', 'Reassess valuation']
+        : ['Monitor for entry point', 'Review valuation metrics']
+    },
+    context: {
+      relatedTools: ['complete_valuation', 'calculate_pe_band', 'calculate_dcf', 'calculate_ddm'],
+      alternativeTools: ['calculate_canslim_score'],
+      suggestedFollowUp: [
+        'Run complete valuation for investment decision',
+        'Check financial statements for details',
+        'Review technical indicators'
+      ]
+    }
+  };
+}
 
 // =====================================================
 // COMPLETE VALUATION TOOL
@@ -232,22 +428,28 @@ export const completeValuationTool: Tool = {
     } = args;
 
     try {
-      // Fetch stock data
+      // Fetch stock data (includes validation)
       const stockData = await fetchSetWatchData(symbol);
-      const currentPrice = stockData.peRatio * stockData.eps;
+
+      // Validate required fields for calculations
+      const eps = requireNumber(stockData.eps, 'EPS', symbol);
+      const peRatio = requireNumber(stockData.peRatio, 'PE ratio', symbol);
+      const sharesOutstanding = requireNumber(stockData.sharesOutstanding, 'shares outstanding', symbol);
+      const currentPrice = peRatio * eps;
+      const validatedSymbol = validateSymbol(symbol);
 
       const results: any = {
-        symbol: `${symbol}.BK`,
+        symbol: `${validatedSymbol}.BK`,
         currentPrice,
         lastUpdated: new Date().toISOString(),
         data: {
-          marketCap: stockData.marketCap,
-          eps: stockData.eps,
-          peRatio: stockData.peRatio,
-          pbRatio: stockData.pbRatio,
-          dividendYield: stockData.dividendYield,
-          roe: stockData.returnOnEquity,
-          beta: stockData.beta5Y
+          marketCap: safeNumber(stockData.marketCap),
+          eps: eps,
+          peRatio: peRatio,
+          pbRatio: safeNumber(stockData.pbRatio),
+          dividendYield: safeNumber(stockData.dividendYield),
+          roe: safeNumber(stockData.returnOnEquity),
+          beta: safeNumber(stockData.beta5Y)
         },
         valuations: {}
       };
@@ -255,13 +457,13 @@ export const completeValuationTool: Tool = {
       // 1. PE Band Analysis
       // Use default historical PEs for Thai market
       const historicalPEs = [8, 10, 12, 15, 18, 20, 22, 25, 15, 13, 11, 9];
-      const currentPE = currentPrice / stockData.eps;
+      const currentPE = currentPrice / eps;
       const avgPE = historicalPEs.reduce((a, b) => a + b, 0) / historicalPEs.length;
       const minPE = Math.min(...historicalPEs);
       const maxPE = Math.max(...historicalPEs);
 
-      const fairValueLower = minPE * stockData.eps;
-      const fairValueUpper = maxPE * stockData.eps;
+      const fairValueLower = minPE * eps;
+      const fairValueUpper = maxPE * eps;
 
       let peRecommendation: 'Undervalued' | 'Fairly Valued' | 'Overvalued';
       if (currentPrice < fairValueLower) {
@@ -282,10 +484,11 @@ export const completeValuationTool: Tool = {
       };
 
       // 2. DDM Valuation (if dividend > 0)
-      if (stockData.dividendPerShare > 0) {
-        const d1 = stockData.dividendPerShare * (1 + growthRate);
-        const dcfIntrinsicValue = d1 / (requiredReturn - growthRate);
-        const marginOfSafety = ((currentPrice - dcfIntrinsicValue) / dcfIntrinsicValue) * 100;
+      const dividendPerShare = safeNumber(stockData.dividendPerShare);
+      if (dividendPerShare > 0) {
+        const d1 = dividendPerShare * (1 + growthRate);
+        const ddmIntrinsicValue = d1 / (requiredReturn - growthRate);
+        const marginOfSafety = ((currentPrice - ddmIntrinsicValue) / ddmIntrinsicValue) * 100;
 
         let ddmRecommendation: 'Buy' | 'Hold' | 'Sell';
         if (marginOfSafety < -20) {
@@ -297,10 +500,10 @@ export const completeValuationTool: Tool = {
         }
 
         results.valuations.ddm = {
-          dividend: stockData.dividendPerShare,
+          dividend: dividendPerShare,
           requiredReturn,
           growthRate,
-          intrinsicValue: dcfIntrinsicValue,
+          intrinsicValue: ddmIntrinsicValue,
           marginOfSafety,
           recommendation: ddmRecommendation
         };
@@ -313,59 +516,73 @@ export const completeValuationTool: Tool = {
 
       // 3. DCF Valuation
       const projections = [];
-      let projectedFCF = stockData.freeCashFlow;
-      let npv = 0;
+      const freeCashFlow = safeNumber(stockData.freeCashFlow);
+      let dcfRecommendation: 'Buy' | 'Hold' | 'Sell' | 'N/A' = 'N/A';
+      let dcfIntrinsicValue: number | null = null;
 
-      for (let year = 1; year <= years; year++) {
-        projectedFCF *= (1 + growthRate);
-        const presentValue = projectedFCF / Math.pow(1 + discountRate, year);
-        npv += presentValue;
+      // Skip DCF if no FCF data
+      if (freeCashFlow > 0) {
+        let projectedFCF = freeCashFlow;
+        let npv = 0;
 
-        projections.push({
-          year,
-          fcf: projectedFCF,
-          presentValue
-        });
-      }
+        for (let year = 1; year <= years; year++) {
+          projectedFCF *= (1 + growthRate);
+          const presentValue = projectedFCF / Math.pow(1 + discountRate, year);
+          npv += presentValue;
 
-      const terminalGrowthRate = 0.025; // 2.5% terminal growth
-      const terminalFCF = projectedFCF * (1 + terminalGrowthRate);
-      const terminalValue = terminalFCF / (discountRate - terminalGrowthRate);
-      const terminalPresentValue = terminalValue / Math.pow(1 + discountRate, years);
+          projections.push({
+            year,
+            fcf: projectedFCF,
+            presentValue
+          });
+        }
 
-      const totalNPV = npv + terminalPresentValue;
-      const dcfIntrinsicValue = totalNPV / stockData.sharesOutstanding;
-      const dcfMarginOfSafety = ((currentPrice - dcfIntrinsicValue) / dcfIntrinsicValue) * 100;
+        const terminalGrowthRate = 0.025; // 2.5% terminal growth
+        const terminalFCF = projectedFCF * (1 + terminalGrowthRate);
+        const terminalValue = terminalFCF / (discountRate - terminalGrowthRate);
+        const terminalPresentValue = terminalValue / Math.pow(1 + discountRate, years);
 
-      let dcfRecommendation: 'Buy' | 'Hold' | 'Sell';
-      if (dcfMarginOfSafety < -20) {
-        dcfRecommendation = 'Buy';
-      } else if (dcfMarginOfSafety > 20) {
-        dcfRecommendation = 'Sell';
+        const totalNPV = npv + terminalPresentValue;
+        dcfIntrinsicValue = totalNPV / sharesOutstanding;
+        const dcfMarginOfSafety = ((currentPrice - dcfIntrinsicValue) / dcfIntrinsicValue) * 100;
+
+        if (dcfMarginOfSafety < -20) {
+          dcfRecommendation = 'Buy';
+        } else if (dcfMarginOfSafety > 20) {
+          dcfRecommendation = 'Sell';
+        } else {
+          dcfRecommendation = 'Hold';
+        }
+
+        results.valuations.dcf = {
+          freeCashFlow: freeCashFlow,
+          growthRate,
+          discountRate,
+          terminalGrowthRate,
+          intrinsicValue: dcfIntrinsicValue,
+          marginOfSafety: dcfMarginOfSafety,
+          npv: totalNPV,
+          recommendation: dcfRecommendation,
+          projections
+        };
       } else {
-        dcfRecommendation = 'Hold';
+        results.valuations.dcf = {
+          note: 'No free cash flow data - DCF not applicable',
+          freeCashFlow: 0,
+          recommendation: 'N/A'
+        };
       }
-
-      results.valuations.dcf = {
-        freeCashFlow: stockData.freeCashFlow,
-        growthRate,
-        discountRate,
-        terminalGrowthRate,
-        intrinsicValue: dcfIntrinsicValue,
-        marginOfSafety: dcfMarginOfSafety,
-        npv: totalNPV,
-        recommendation: dcfRecommendation,
-        projections
-      };
 
       // Overall Recommendation
       const recommendations = [];
       recommendations.push(peRecommendation === 'Undervalued' ? 'Buy' : peRecommendation === 'Overvalued' ? 'Sell' : 'Hold');
 
-      if (stockData.dividendPerShare > 0 && results.valuations.ddm.recommendation) {
+      if (dividendPerShare > 0 && results.valuations.ddm.recommendation) {
         recommendations.push(results.valuations.ddm.recommendation);
       }
-      recommendations.push(dcfRecommendation);
+      if (dcfRecommendation !== 'N/A') {
+        recommendations.push(dcfRecommendation);
+      }
 
       const buys = recommendations.filter(r => r === 'Buy').length;
       const sells = recommendations.filter(r => r === 'Sell').length;
@@ -380,12 +597,14 @@ export const completeValuationTool: Tool = {
       }
 
       // Calculate average intrinsic value and margin of safety
-      const peIntrinsicValue = avgPE * stockData.eps;
+      const peIntrinsicValue = avgPE * eps;
       const intrinsicValues = [peIntrinsicValue];
       if (results.valuations.ddm && results.valuations.ddm.intrinsicValue) {
         intrinsicValues.push(results.valuations.ddm.intrinsicValue);
       }
-      intrinsicValues.push(dcfIntrinsicValue);
+      if (dcfIntrinsicValue !== null) {
+        intrinsicValues.push(dcfIntrinsicValue);
+      }
 
       const averageIntrinsicValue = intrinsicValues.reduce((a, b) => a + b, 0) / intrinsicValues.length;
       const averageMarginOfSafety = ((averageIntrinsicValue - currentPrice) / averageIntrinsicValue) * 100;
@@ -416,7 +635,7 @@ export const completeValuationTool: Tool = {
         marginOfSafety: averageMarginOfSafety,
         recommendation: mosRecommendation,
         riskLevel: mosRiskLevel,
-        analysis: `Average intrinsic value across methods: $${averageIntrinsicValue.toFixed(2)}.
+        analysis: `Average intrinsic value across methods: ${averageIntrinsicValue.toFixed(2)}.
                   Current margin of safety: ${averageMarginOfSafety.toFixed(1)}%.
                   This suggests the stock is ${mosRecommendation.toLowerCase()} with ${mosRiskLevel.toLowerCase()} risk.`
       };
@@ -430,9 +649,117 @@ export const completeValuationTool: Tool = {
         overall: overallRecommendation
       };
 
-      return results;
+      return formatCompleteValuationResponse(results);
     } catch (error) {
       throw new Error(`Failed to run complete valuation: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 };
+
+/**
+ * Format complete valuation as SmartResponse
+ */
+function formatCompleteValuationResponse(data: any): SmartResponse<any> {
+  const { symbol, currentPrice, valuations, overallRecommendation, summary, lastUpdated } = data;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Build key findings from each valuation
+  const peBand = valuations.peBand;
+  if (peBand) {
+    const status = peBand.recommendation === 'Undervalued' ? 'Undervalued' : peBand.recommendation === 'Overvalued' ? 'Overvalued' : 'Fairly Valued';
+    keyFindings.push(`PE Band: ${status} (PE: ${peBand.currentPE.toFixed(1)})`);
+  }
+
+  const ddm = valuations.ddm;
+  if (ddm && ddm.recommendation !== 'N/A') {
+    keyFindings.push(`DDM: ${ddm.recommendation} (Intrinsic: ฿${ddm.intrinsicValue?.toFixed(2)})`);
+  } else if (ddm && ddm.note) {
+    warnings.push('DDM: No dividend data available');
+  }
+
+  const dcf = valuations.dcf;
+  if (dcf && dcf.recommendation && dcf.recommendation !== 'N/A') {
+    keyFindings.push(`DCF: ${dcf.recommendation} (Intrinsic: ฿${dcf.intrinsicValue?.toFixed(2)})`);
+  } else if (dcf && dcf.note) {
+    warnings.push('DCF: No free cash flow data available');
+  }
+
+  const mos = valuations.marginOfSafety;
+  if (mos) {
+    keyFindings.push(`Margin of Safety: ${mos.marginOfSafety?.toFixed(1)}% (${mos.recommendation})`);
+    keyFindings.push(`Risk Level: ${mos.riskLevel}`);
+  }
+
+  // Determine action
+  let action: 'Buy' | 'Sell' | 'Hold' | 'Avoid' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (overallRecommendation === 'Buy') {
+    action = 'Buy';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else if (overallRecommendation === 'Sell') {
+    action = 'Sell';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else {
+    action = 'Hold';
+    priority = 'Low';
+    confidence = 'Low';
+  }
+
+  // Boost confidence if margin of safety is strong
+  if (mos && mos.marginOfSafety >= 30) {
+    confidence = 'High';
+    priority = 'High';
+  }
+
+  return {
+    summary: {
+      title: `Complete Valuation - ${symbol}`,
+      what: `Comprehensive valuation using PE Band, DDM, DCF, and Margin of Safety`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: {
+      symbol,
+      currentPrice,
+      lastUpdated,
+      valuations,
+      summary
+    },
+    metadata: {
+      tool: 'complete_valuation',
+      category: 'Valuation',
+      dataSource: 'SET Watch API + Calculated Valuations',
+      lastUpdated: lastUpdated || new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: warnings.length === 0 ? DataQuality.HIGH : DataQuality.MEDIUM,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations: {
+      investment: action,
+      priority,
+      reasoning: `${overallRecommendation} based on ${Object.values(valuations).filter(v => v !== null).length} valuation methods`,
+      nextSteps: action === 'Buy'
+        ? ['Verify intrinsic value assumptions', 'Check financial health', 'Consider position sizing']
+        : action === 'Sell'
+        ? ['Consider taking profits', 'Reassess valuation assumptions']
+        : ['Wait for better entry point', 'Monitor valuation changes']
+    },
+    context: {
+      relatedTools: ['fetch_stock_data', 'calculate_margin_of_safety', 'calculate_pe_band', 'calculate_dcf', 'calculate_ddm'],
+      alternativeTools: ['calculate_canslim_score'],
+      suggestedFollowUp: [
+        'Review financial statements for details',
+        'Check management commentary',
+        'Monitor technical indicators'
+      ]
+    }
+  };
+}

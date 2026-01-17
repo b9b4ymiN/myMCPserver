@@ -11,7 +11,15 @@
     "dev": "tsx src/index.ts",
     "dev:stdio": "tsx src/index.ts --stdio",
     "test": "jest",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "agent": "node agents/cli.mjs",
+    "agent:dev": "node agents/cli.mjs dev",
+    "agent:qa": "node agents/cli.mjs qa",
+    "agent:workflow": "node agents/cli.mjs workflow",
+    "agent:status": "node agents/cli.mjs status",
+    "agent:convert": "node agents/cli.mjs convert-to-v2",
+    "agent:validate": "node agents/cli.mjs validate",
+    "agent:test": "node agents/test-agent.mjs"
   },
   "keywords": [
     "mcp",

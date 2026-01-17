@@ -1,5 +1,10 @@
 import { StockData, PEBandResult, DDMResult, DCFResult, MarginOfSafetyResult, Tool } from '../types/index.js';
 import { ToolCategory } from '../types/tool-descriptions.js';
+import {
+  SmartResponse,
+  DataQuality,
+  Completeness
+} from '../types/responses.js';
 
 // Helper functions
 function calculatePE(price: number, eps: number): number {
@@ -116,12 +121,133 @@ const peBandTool: Tool = {
         analysis
       };
 
-      return result;
+      // Format as SmartResponse
+      return formatSmartPEBandResult(result);
     } catch (error) {
       throw new Error(`Failed to calculate PE band for ${symbol}: ${error}`);
     }
   }
 };
+
+/**
+ * Format PE Band result as SmartResponse
+ */
+export function formatSmartPEBandResult(result: PEBandResult): SmartResponse<PEBandResult> {
+  const { symbol, currentPE, averagePE, minPE, maxPE, pePercentile, fairValueRange, recommendation, analysis } = result;
+  const { lower: fairValueLower, upper: fairValueUpper } = fairValueRange;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Analyze position within historical range
+  if (pePercentile <= 20) {
+    keyFindings.push(`PE is in top ${pePercentile.toFixed(0)} percentile - very attractive`);
+  } else if (pePercentile >= 80) {
+    keyFindings.push(`PE is in bottom ${(100 - pePercentile).toFixed(0)} percentile - expensive`);
+  }
+
+  // Determine action and priority
+  let action: 'Buy' | 'Sell' | 'Hold' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (recommendation === 'Undervalued') {
+    action = 'Buy';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else if (recommendation === 'Overvalued') {
+    action = 'Sell';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else {
+    action = 'Hold';
+    priority = 'Low';
+    confidence = 'Low';
+  }
+
+  // Build key findings
+  keyFindings.push(`PE ratio of ${currentPE.toFixed(2)} (historical average: ${averagePE.toFixed(2)})`);
+
+  if (minPE && maxPE) {
+    keyFindings.push(`PE range: ${minPE.toFixed(2)} - ${maxPE.toFixed(2)}`);
+    keyFindings.push(`Fair value: ${formatCurrency(fairValueLower)} - ${formatCurrency(fairValueUpper)}`);
+  }
+
+  // Add to recommendations
+  const recommendations = {
+    investment: action,
+    priority,
+    reasoning: `${recommendation} based on PE analysis`,
+    nextSteps: [] as string[]
+  };
+
+  if (action === 'Buy') {
+    recommendations.nextSteps = [
+      'Verify earnings quality',
+      'Check financial health',
+      'Consider position sizing'
+    ];
+  } else if (action === 'Sell') {
+    recommendations.nextSteps = [
+      'Take profits if available',
+      'Reconsider thesis',
+      'Wait for pullback'
+    ];
+  }
+
+  return {
+    summary: {
+      title: `PE Band Valuation - ${symbol}`,
+      what: `Price-to-earnings ratio analysis using historical PE range`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: result,
+    metadata: {
+      tool: 'calculate_pe_band',
+      category: 'Valuation',
+      dataSource: 'Calculated from inputs',
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: DataQuality.HIGH,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations
+  };
+}
+
+// =====================================================
+// Helper Functions
+// =====================================================
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function formatCurrency(value: number): string {
+  return `฿${value.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+function status(shouldPass: boolean): string {
+  return shouldPass ? '✓' : '✗';
+}
+
+function highlights(items: string[]): string {
+  return items.map(item => `• ${item}`).join('\n');
+}
+
+function warnings(items: string[]): string {
+  return items.map(w => `⚠️ ${w}`).join('\n');
+}
+
+function hasValue(value: any): boolean {
+  return value !== null && value !== undefined && !isNaN(value);
+}
 
 // =====================================================
 // DDM (Dividend Discount Model) Calculation Tool
@@ -219,12 +345,103 @@ const ddmTool: Tool = {
         analysis
       };
 
-      return result;
+      return formatSmartDDMResult(result);
     } catch (error) {
       throw new Error(`Failed to calculate DDM for ${symbol}: ${error}`);
     }
   }
 };
+
+/**
+ * Format DDM result as SmartResponse
+ */
+export function formatSmartDDMResult(result: DDMResult): SmartResponse<DDMResult> {
+  const { symbol, currentPrice, dividend, requiredReturn, growthRate, intrinsicValue, marginOfSafety, recommendation } = result;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Build key findings
+  keyFindings.push(`Intrinsic value: ${formatCurrency(intrinsicValue)} (current: ${formatCurrency(currentPrice)})`);
+  keyFindings.push(`Margin of Safety: ${marginOfSafety >= 0 ? '+' : ''}${marginOfSafety.toFixed(1)}%`);
+  keyFindings.push(`Dividend: ${formatCurrency(dividend)} growing at ${formatPercent(growthRate * 100)}`);
+
+  // Determine action
+  let action: 'Buy' | 'Sell' | 'Hold' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (recommendation === 'Buy') {
+    action = 'Buy';
+    priority = marginOfSafety <= -30 ? 'High' : 'Medium';
+    confidence = marginOfSafety <= -30 ? 'High' : 'Medium';
+  } else if (recommendation === 'Sell') {
+    action = 'Sell';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else {
+    action = 'Hold';
+    priority = 'Low';
+    confidence = 'Low';
+  }
+
+  // Build recommendations
+  const recommendations = {
+    investment: action,
+    priority,
+    reasoning: `${recommendation} based on DDM valuation with ${marginOfSafety.toFixed(1)}% margin of safety`,
+    nextSteps: [] as string[]
+  };
+
+  if (action === 'Buy') {
+    recommendations.nextSteps = [
+      'Verify dividend sustainability',
+      'Check payout ratio',
+      'Review dividend history'
+    ];
+  } else if (action === 'Sell') {
+    recommendations.nextSteps = [
+      'Consider taking profits',
+      'Reassess dividend growth assumptions'
+    ];
+  } else {
+    recommendations.nextSteps = [
+      'Wait for better entry point',
+      'Monitor dividend changes'
+    ];
+  }
+
+  return {
+    summary: {
+      title: `DDM Valuation - ${symbol}`,
+      what: `Dividend Discount Model (Gordon Growth) valuation analysis`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: result,
+    metadata: {
+      tool: 'calculate_ddm',
+      category: 'Valuation',
+      dataSource: 'Calculated from inputs (Gordon Growth Model)',
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: DataQuality.HIGH,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations,
+    context: {
+      relatedTools: ['calculate_margin_of_safety', 'calculate_pe_band', 'calculate_dcf'],
+      alternativeTools: ['calculate_dcf'],
+      suggestedFollowUp: [
+        'Compare with other valuation methods',
+        'Check dividend payout ratio',
+        'Verify dividend growth sustainability'
+      ]
+    }
+  };
+}
 
 // =====================================================
 // DCF (Discounted Cash Flow) Calculation Tool
@@ -366,12 +583,104 @@ const dcfTool: Tool = {
         projections
       };
 
-      return result;
+      return formatSmartDCFResult(result);
     } catch (error) {
       throw new Error(`Failed to calculate DCF for ${symbol}: ${error}`);
     }
   }
 };
+
+/**
+ * Format DCF result as SmartResponse
+ */
+export function formatSmartDCFResult(result: DCFResult): SmartResponse<DCFResult> {
+  const { symbol, currentPrice, freeCashFlow, growthRate, discountRate, terminalGrowthRate, intrinsicValue, marginOfSafety, npv, recommendation, projections } = result;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Build key findings
+  keyFindings.push(`Intrinsic value: ${formatCurrency(intrinsicValue)} (current: ${formatCurrency(currentPrice)})`);
+  keyFindings.push(`Margin of Safety: ${marginOfSafety >= 0 ? '+' : ''}${marginOfSafety.toFixed(1)}%`);
+  keyFindings.push(`NPV of future FCF: ${formatCurrency(npv)} over ${projections.length} years`);
+  keyFindings.push(`FCF growth assumption: ${formatPercent(growthRate * 100)}`);
+
+  // Determine action
+  let action: 'Buy' | 'Sell' | 'Hold' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (recommendation === 'Buy') {
+    action = 'Buy';
+    priority = marginOfSafety <= -30 ? 'High' : 'Medium';
+    confidence = marginOfSafety <= -30 ? 'High' : 'Medium';
+  } else if (recommendation === 'Sell') {
+    action = 'Sell';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else {
+    action = 'Hold';
+    priority = 'Low';
+    confidence = 'Low';
+  }
+
+  // Build recommendations
+  const recommendations = {
+    investment: action,
+    priority,
+    reasoning: `${recommendation} based on DCF valuation with ${marginOfSafety.toFixed(1)}% margin of safety`,
+    nextSteps: [] as string[]
+  };
+
+  if (action === 'Buy') {
+    recommendations.nextSteps = [
+      'Verify FCF growth assumptions',
+      'Check capital expenditure trends',
+      'Review discount rate (WACC) assumptions'
+    ];
+  } else if (action === 'Sell') {
+    recommendations.nextSteps = [
+      'Consider taking profits',
+      'Reassess growth assumptions'
+    ];
+  } else {
+    recommendations.nextSteps = [
+      'Wait for better entry point',
+      'Monitor FCF trends'
+    ];
+  }
+
+  return {
+    summary: {
+      title: `DCF Valuation - ${symbol}`,
+      what: `Discounted Cash Flow valuation analysis with ${projections.length}-year projection`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: result,
+    metadata: {
+      tool: 'calculate_dcf',
+      category: 'Valuation',
+      dataSource: 'Calculated from inputs (DCF Model)',
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: DataQuality.HIGH,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations,
+    context: {
+      relatedTools: ['calculate_margin_of_safety', 'calculate_pe_band', 'calculate_ddm'],
+      alternativeTools: ['calculate_ddm'],
+      suggestedFollowUp: [
+        'Compare with other valuation methods',
+        'Verify WACC assumptions',
+        'Check historical FCF trends'
+      ]
+    }
+  };
+}
 
 // =====================================================
 // Margin of Safety Calculation Tool
@@ -521,12 +830,119 @@ const marginOfSafetyTool: Tool = {
       (result as any).unadjustedMarginOfSafety = marginOfSafety;
       (result as any).riskAdjustmentFactor = riskAdjustment;
 
-      return result;
+      return formatSmartMarginOfSafetyResult(result);
     } catch (error) {
       throw new Error(`Failed to calculate margin of safety for ${symbol}: ${error}`);
     }
   }
 };
+
+/**
+ * Format Margin of Safety result as SmartResponse
+ */
+export function formatSmartMarginOfSafetyResult(result: MarginOfSafetyResult): SmartResponse<MarginOfSafetyResult> {
+  const { symbol, currentPrice, intrinsicValue, marginOfSafety, marginOfSafetyPercentage, valuationMethod, recommendation, analysis, riskLevel } = result;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  // Build key findings
+  keyFindings.push(`Margin of Safety: ${marginOfSafetyPercentage >= 0 ? '+' : ''}${marginOfSafetyPercentage.toFixed(1)}%`);
+  keyFindings.push(`Intrinsic value: ${formatCurrency(intrinsicValue)} (current: ${formatCurrency(currentPrice)})`);
+  keyFindings.push(`Risk Level: ${riskLevel}`);
+  keyFindings.push(`Valuation method: ${valuationMethod}`);
+
+  // Add principles check if available
+  const principlesCheck = (result as any).principlesCheck;
+  if (principlesCheck) {
+    if (principlesCheck.belowIntrinsicValue) {
+      keyFindings.push('✓ Price below intrinsic value (value investing principle)');
+    }
+    if (principlesCheck.adequateMargin) {
+      keyFindings.push('✓ Adequate margin of safety (≥20%)');
+    }
+  }
+
+  // Determine action
+  let action: 'Buy' | 'Sell' | 'Hold' | 'Avoid' = 'Hold';
+  let priority: 'High' | 'Medium' | 'Low' = 'Medium';
+  let confidence: 'High' | 'Medium' | 'Low' = 'Medium';
+
+  if (recommendation === 'Strong Buy') {
+    action = 'Buy';
+    priority = 'High';
+    confidence = 'High';
+  } else if (recommendation === 'Buy') {
+    action = 'Buy';
+    priority = 'Medium';
+    confidence = 'Medium';
+  } else if (recommendation === 'Sell' || recommendation === 'Strong Sell') {
+    action = 'Sell';
+    priority = recommendation === 'Strong Sell' ? 'High' : 'Medium';
+    confidence = 'Medium';
+  } else {
+    action = 'Hold';
+    priority = 'Low';
+    confidence = 'Low';
+  }
+
+  // Build recommendations
+  const recommendations = {
+    investment: action,
+    priority,
+    reasoning: `${recommendation} based on ${marginOfSafetyPercentage.toFixed(1)}% margin of safety (${riskLevel} risk)`,
+    nextSteps: [] as string[]
+  };
+
+  if (action === 'Buy') {
+    recommendations.nextSteps = [
+      'Verify intrinsic value calculation',
+      'Check financial health metrics',
+      'Consider position sizing based on margin of safety'
+    ];
+  } else if (action === 'Sell') {
+    recommendations.nextSteps = [
+      'Consider taking profits or reducing position',
+      'Reassess intrinsic value assumptions'
+    ];
+  } else {
+    recommendations.nextSteps = [
+      'Wait for better entry point',
+      'Monitor for changes in intrinsic value'
+    ];
+  }
+
+  return {
+    summary: {
+      title: `Margin of Safety Analysis - ${symbol}`,
+      what: `Value investing risk assessment using Benjamin Graham's margin of safety principle`,
+      keyFindings,
+      action,
+      confidence
+    },
+    data: result,
+    metadata: {
+      tool: 'calculate_margin_of_safety',
+      category: 'Valuation',
+      dataSource: `Calculated from inputs (${valuationMethod})`,
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: DataQuality.HIGH,
+      completeness: Completeness.COMPLETE,
+      warnings
+    },
+    recommendations,
+    context: {
+      relatedTools: ['calculate_pe_band', 'calculate_dcf', 'calculate_ddm', 'fetch_stock_data'],
+      alternativeTools: ['calculate_pe_band'],
+      suggestedFollowUp: [
+        'Review intrinsic value calculation',
+        'Check financial health (Altman Z-Score)',
+        'Verify valuation assumptions'
+      ]
+    }
+  };
+}
 
 // Export all tools
 export const stockValuationTools: Tool[] = [

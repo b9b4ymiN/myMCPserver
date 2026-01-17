@@ -25,6 +25,7 @@ import { webTools } from './tools/webTools.js';
 import { utilityTools } from './tools/utilityTools.js';
 import { fileSystemTools } from './tools/fileSystemTools.js';
 import { mathTools } from './tools/mathTools.js';
+import { canslimTool } from './tools/canslim.js';
 import { SERVER_CONFIG } from './config/index.js';
 
 const server = new Server(
@@ -45,6 +46,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       ...stockValuationTools,
       fetchStockDataTool,
       completeValuationTool,
+      canslimTool,
       fetchIncomeStatementTool,
       fetchBalanceSheetTool,
       fetchCashFlowStatementTool,
@@ -70,6 +72,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     ...stockValuationTools,
     fetchStockDataTool,
     completeValuationTool,
+    canslimTool,
     fetchIncomeStatementTool,
     fetchBalanceSheetTool,
     fetchCashFlowStatementTool,
@@ -112,6 +115,7 @@ const allTools = [
   ...stockValuationTools,
   fetchStockDataTool,
   completeValuationTool,
+  canslimTool,
   fetchIncomeStatementTool,
   fetchBalanceSheetTool,
   fetchCashFlowStatementTool,
@@ -272,6 +276,9 @@ app.post('/mcp', async (req, res) => {
 
 // Helper functions
 function getCategory(toolName: string): string {
+  if (toolName.includes('canslim') || toolName.includes('calculate_canslim')) {
+    return 'Growth Screening';
+  }
   if (toolName.includes('pe_band') || toolName.includes('ddm') || toolName.includes('dcf') ||
       toolName.includes('graham_number') || toolName.includes('discounted_earnings') ||
       toolName.includes('asset_based') || toolName.includes('ev_ebitda') ||
@@ -380,6 +387,13 @@ function getToolExample(toolName: string): any {
           requiredReturn: 0.10,
           growthRate: 0.05,
           discountRate: 0.10
+        }
+      };
+    case 'calculate_canslim_score':
+      return {
+        arguments: {
+          symbol: 'ADVANC',
+          marketDirection: 'bull'
         }
       };
     case 'web_search':

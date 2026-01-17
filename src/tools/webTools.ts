@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import { Tool } from '../types/index.js';
 import { API_CONFIG } from '../config/index.js';
 import { ToolCategory } from '../types/tool-descriptions.js';
+import { SmartResponse } from '../types/responses.js';
 
 // =====================================================
 // WEB SEARCH TOOL (DuckDuckGo - Free, No API Key)
@@ -137,7 +138,7 @@ const webSearchTool: Tool = {
         searchTime
       };
 
-      return result;
+      return formatWebSearchResponse(result);
     } catch (error) {
       throw new Error(`Web search failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -370,7 +371,7 @@ const webFetchTool: Tool = {
         images
       };
 
-      return result;
+      return formatWebFetchResponse(result);
     } catch (error) {
       throw new Error(`Failed to fetch URL "${url}": ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -541,7 +542,7 @@ const newsSearchTool: Tool = {
         sources: Array.from(sources)
       };
 
-      return result;
+      return formatNewsSearchResponse(result);
     } catch (error) {
       throw new Error(`News search failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -647,6 +648,198 @@ function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
   if (positiveCount > negativeCount) return 'positive';
   if (negativeCount > positiveCount) return 'negative';
   return 'neutral';
+}
+
+// =====================================================
+// SMART RESPONSE FORMATTERS
+// =====================================================
+
+function formatWebSearchResponse(data: WebSearchResponse): SmartResponse<WebSearchResponse> {
+  const { query, totalResults, results, searchTime } = data;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  keyFindings.push(`Found ${totalResults} results for "${query}"`);
+  keyFindings.push(`Search completed in ${searchTime}ms`);
+
+  if (totalResults === 0) {
+    warnings.push('No results found - try a different query');
+  }
+
+  // Get top 3 result titles as key findings
+  if (results.length > 0) {
+    const topResults = results.slice(0, 3).map(r => `• ${r.title}`).join('\n');
+    keyFindings.push(`Top results:\n${topResults}`);
+  }
+
+  return {
+    summary: {
+      title: `Web Search - ${query}`,
+      what: `Web search results from DuckDuckGo`,
+      keyFindings,
+      action: totalResults > 0 ? 'Review search results' : 'Try different query',
+      confidence: totalResults > 0 ? 'High' : 'Low'
+    },
+    data,
+    metadata: {
+      tool: 'web_search',
+      category: 'Utility',
+      dataSource: 'DuckDuckGo (web scraping)',
+      lastUpdated: new Date().toISOString(),
+      processingTime: searchTime,
+      dataQuality: totalResults > 0 ? 'high' : 'low',
+      completeness: 'complete',
+      warnings
+    },
+    recommendations: totalResults > 0 ? {
+      investment: 'Hold',
+      priority: 'Low',
+      reasoning: `Search completed successfully with ${totalResults} results`,
+      nextSteps: [
+        'Click on relevant results for more information',
+        'Refine search if needed',
+        'Use web_fetch for detailed content'
+      ]
+    } : undefined,
+    context: {
+      relatedTools: ['web_fetch', 'news_search'],
+      alternativeTools: [],
+      suggestedFollowUp: [
+        'Fetch specific articles for detailed reading',
+        'Search news for recent updates',
+        'Refine query with specific terms'
+      ]
+    }
+  };
+}
+
+function formatWebFetchResponse(data: WebFetchResult): SmartResponse<WebFetchResult> {
+  const { url, title, metadata } = data;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  keyFindings.push(`Title: ${title}`);
+  keyFindings.push(`Word count: ${metadata.wordCount}`);
+  keyFindings.push(`Content length: ${data.content.length} characters`);
+
+  if (metadata.author) {
+    keyFindings.push(`Author: ${metadata.author}`);
+  }
+  if (metadata.publishedDate) {
+    keyFindings.push(`Published: ${new Date(metadata.publishedDate).toLocaleDateString()}`);
+  }
+
+  return {
+    summary: {
+      title: `Web Content - ${title}`,
+      what: `Fetched and extracted content from ${new URL(url).hostname}`,
+      keyFindings,
+      action: 'Review extracted content',
+      confidence: 'High'
+    },
+    data,
+    metadata: {
+      tool: 'web_fetch',
+      category: 'Utility',
+      dataSource: `Direct HTTP fetch from ${new URL(url).hostname}`,
+      lastUpdated: metadata.fetchedAt,
+      processingTime: 0,
+      dataQuality: 'high',
+      completeness: 'complete',
+      warnings
+    },
+    recommendations: {
+      investment: 'Hold',
+      priority: 'Low',
+      reasoning: `Content fetched successfully (${metadata.wordCount} words)`,
+      nextSteps: [
+        'Read and analyze the content',
+        'Extract key information',
+        'Check sources and references'
+      ]
+    },
+    context: {
+      relatedTools: ['web_search', 'news_search'],
+      alternativeTools: [],
+      suggestedFollowUp: [
+        'Search for related content',
+        'Verify information from other sources',
+        'Summarize key points'
+      ]
+    }
+  };
+}
+
+function formatNewsSearchResponse(data: NewsSearchResponse): SmartResponse<NewsSearchResponse> {
+  const { query, totalResults, articles, sources } = data;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  keyFindings.push(`Found ${totalResults} articles for "${query}"`);
+  if (sources.length > 0) {
+    keyFindings.push(`Sources: ${sources.slice(0, 5).join(', ')}`);
+  }
+
+  // Get top 3 headlines
+  if (articles.length > 0) {
+    const topHeadlines = articles.slice(0, 3).map(a => `• ${a.title}`).join('\n');
+    keyFindings.push(`Top headlines:\n${topHeadlines}`);
+  }
+
+  // Count sentiment
+  const sentimentCount = articles.reduce((acc, a) => {
+    if (a.sentiment === 'positive') acc.positive++;
+    else if (a.sentiment === 'negative') acc.negative++;
+    else acc.neutral++;
+    return acc;
+  }, { positive: 0, negative: 0, neutral: 0 });
+
+  if (sentimentCount.positive > 0 || sentimentCount.negative > 0) {
+    keyFindings.push(`Sentiment: ${sentimentCount.positive} positive, ${sentimentCount.negative} negative`);
+  }
+
+  return {
+    summary: {
+      title: `News Search - ${query}`,
+      what: `News articles from Google News RSS`,
+      keyFindings,
+      action: totalResults > 0 ? 'Review news articles' : 'Try different query',
+      confidence: totalResults > 0 ? 'High' : 'Low'
+    },
+    data,
+    metadata: {
+      tool: 'news_search',
+      category: 'Utility',
+      dataSource: 'Google News RSS feed',
+      lastUpdated: new Date().toISOString(),
+      processingTime: data.searchTime,
+      dataQuality: totalResults > 0 ? 'high' : 'low',
+      completeness: 'complete',
+      warnings: totalResults === 0 ? ['No articles found'] : []
+    },
+    recommendations: totalResults > 0 ? {
+      investment: 'Hold',
+      priority: 'Low',
+      reasoning: `Found ${totalResults} news articles`,
+      nextSteps: [
+        'Read recent articles for updates',
+        'Check multiple sources for balanced view',
+        'Look for sentiment trends'
+      ]
+    } : undefined,
+    context: {
+      relatedTools: ['web_search', 'web_fetch'],
+      alternativeTools: [],
+      suggestedFollowUp: [
+        'Fetch full articles for detailed reading',
+        'Search for related topics',
+        'Monitor for news updates over time'
+      ]
+    }
+  };
 }
 
 // =====================================================

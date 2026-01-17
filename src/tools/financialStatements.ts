@@ -1,9 +1,20 @@
 import axios from 'axios';
 import { IncomeStatement, BalanceSheet, CashFlowStatement, FinancialStatements, Tool } from '../types/index.js';
 import { API_CONFIG } from '../config/index.js';
+import { SmartResponse, DataQuality, Completeness } from '../types/responses.js';
 
 // Base URL for SET Watch financial statements API
 const BASE_URL = `${API_CONFIG.SET_WATCH.HOST}/mypick/snapFinancials`;
+
+// Helper function to format currency
+function formatCurrency(value: number): string {
+  return `฿${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Helper function to format percentage
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
 
 // Fetch income statement
 export async function fetchIncomeStatement(symbol: string, period: string = 'TTM'): Promise<IncomeStatement[]> {
@@ -113,8 +124,8 @@ export const fetchIncomeStatementTool: Tool = {
     try {
       const statements = await fetchIncomeStatement(symbol, period);
 
-      return {
-        symbol: `${symbol}.BK`,
+      const data = {
+        symbol: `${symbol.toUpperCase()}.BK`,
         period,
         statementType: 'Income Statement',
         data: statements,
@@ -126,6 +137,8 @@ export const fetchIncomeStatementTool: Tool = {
           totalPeriods: statements.length
         } : null
       };
+
+      return formatFinancialStatementResponse(data, 'Income Statement', symbol);
     } catch (error) {
       throw new Error(`Failed to fetch income statement: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -158,8 +171,8 @@ export const fetchBalanceSheetTool: Tool = {
     try {
       const statements = await fetchBalanceSheet(symbol, period);
 
-      return {
-        symbol: `${symbol}.BK`,
+      const data = {
+        symbol: `${symbol.toUpperCase()}.BK`,
         period,
         statementType: 'Balance Sheet',
         data: statements,
@@ -171,6 +184,8 @@ export const fetchBalanceSheetTool: Tool = {
           totalPeriods: statements.length
         } : null
       };
+
+      return formatFinancialStatementResponse(data, 'Balance Sheet', symbol);
     } catch (error) {
       throw new Error(`Failed to fetch balance sheet: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -203,8 +218,8 @@ export const fetchCashFlowStatementTool: Tool = {
     try {
       const statements = await fetchCashFlowStatement(symbol, period);
 
-      return {
-        symbol: `${symbol}.BK`,
+      const data = {
+        symbol: `${symbol.toUpperCase()}.BK`,
         period,
         statementType: 'Cash Flow Statement',
         data: statements,
@@ -216,6 +231,8 @@ export const fetchCashFlowStatementTool: Tool = {
           totalPeriods: statements.length
         } : null
       };
+
+      return formatFinancialStatementResponse(data, 'Cash Flow Statement', symbol);
     } catch (error) {
       throw new Error(`Failed to fetch cash flow statement: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -294,7 +311,7 @@ export const fetchAllFinancialStatementsTool: Tool = {
       }
 
       return {
-        symbol: `${symbol}.BK`,
+        symbol: `${symbol.toUpperCase()}.BK`,
         period,
         statements,
         analysis,
@@ -311,3 +328,94 @@ export const fetchAllFinancialStatementsTool: Tool = {
     }
   }
 };
+
+/**
+ * Format financial statement response as SmartResponse
+ */
+function formatFinancialStatementResponse(data: any, statementType: string, originalSymbol: string): SmartResponse<any> {
+  const { symbol, period, summary, data: statements } = data;
+  const hasData = summary && statements.length > 0;
+
+  const keyFindings: string[] = [];
+  const warnings: string[] = [];
+
+  if (hasData) {
+    keyFindings.push(`${statementType} for ${symbol} (${period})`);
+    keyFindings.push(`Latest: ${summary.latestPeriod} (FY${summary.fiscalYear})`);
+    keyFindings.push(`Total periods: ${summary.totalPeriods}`);
+    keyFindings.push(`Currency: ${summary.currency}`);
+
+    // Add metrics from latest statement
+    const latest = statements[0]?.data || {};
+    if (statementType === 'Income Statement') {
+      if (latest.revenue && latest.netIncome) {
+        const netMargin = (latest.netIncome / latest.revenue) * 100;
+        keyFindings.push(`Revenue: ${formatCurrency(latest.revenue)} | Net Margin: ${formatPercent(netMargin)}`);
+      }
+      if (latest.grossProfit && latest.revenue) {
+        const grossMargin = (latest.grossProfit / latest.revenue) * 100;
+        keyFindings.push(`Gross Margin: ${formatPercent(grossMargin)}`);
+      }
+    } else if (statementType === 'Balance Sheet') {
+      if (latest.totalAssets && latest.totalLiabilities) {
+        const debtRatio = (latest.totalLiabilities / latest.totalAssets) * 100;
+        keyFindings.push(`Total Assets: ${formatCurrency(latest.totalAssets)} | Debt Ratio: ${formatPercent(debtRatio)}`);
+      }
+      if (latest.totalCurrentAssets && latest.totalCurrentLiabilities) {
+        const currentRatio = latest.totalCurrentAssets / latest.totalCurrentLiabilities;
+        keyFindings.push(`Current Ratio: ${currentRatio.toFixed(2)}x`);
+      }
+    } else if (statementType === 'Cash Flow Statement') {
+      if (latest.operatingCashFlow) {
+        keyFindings.push(`Operating CF: ${formatCurrency(latest.operatingCashFlow)}`);
+      }
+      if (latest.freeCashFlow) {
+        keyFindings.push(`Free CF: ${formatCurrency(latest.freeCashFlow)}`);
+      }
+    }
+  } else {
+    warnings.push('No data available');
+  }
+
+  return {
+    summary: {
+      title: `${statementType} - ${symbol}`,
+      what: `${statementType} data from SET Watch API (${period})`,
+      keyFindings,
+      action: hasData ? 'Review financial metrics' : 'Check symbol or period',
+      confidence: hasData ? 'High' : 'Low'
+    },
+    data,
+    metadata: {
+      tool: statementType === 'Income Statement' ? 'fetch_income_statement' : statementType === 'Balance Sheet' ? 'fetch_balance_sheet' : 'fetch_cash_flow_statement',
+      category: 'Data Fetching',
+      dataSource: 'SET Watch API',
+      lastUpdated: summary?.latestDate || new Date().toISOString(),
+      processingTime: 0,
+      dataQuality: hasData ? 'high' : 'low',
+      completeness: hasData ? 'complete' : 'minimal',
+      warnings
+    },
+    recommendations: hasData ? {
+      investment: 'Hold',
+      priority: 'Low',
+      reasoning: `${statementType} data retrieved successfully`,
+      nextSteps: [
+        'Analyze trends over multiple periods',
+        'Compare with industry averages',
+        'Review ratios and margins'
+      ]
+    } : undefined,
+    context: {
+      relatedTools: statementType === 'Income Statement'
+        ? ['fetch_balance_sheet', 'fetch_cash_flow_statement', 'fetch_all_financial_statements']
+        : ['fetch_income_statement', 'fetch_all_financial_statements'],
+      alternativeTools: ['fetch_stock_data'],
+      suggestedFollowUp: [
+        'Run valuation models with this data',
+        'Calculate financial ratios',
+        'Check for trends across periods'
+      ]
+    }
+  };
+}
